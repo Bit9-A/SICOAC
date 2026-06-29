@@ -12,6 +12,9 @@ import DashboardPage from '@/pages/Dashboard'
 import InventarioPage from '@/pages/Inventario'
 import UsuariosPage from '@/pages/Usuarios'
 import InstitucionesPage from '@/pages/Instituciones'
+import ProductosPage from '@/pages/Productos'
+import CategoriasPage from '@/pages/Categorias'
+import RegistrosPage from '@/pages/Registros'
 
 function AppContent() {
   const { user, profile, loading, logout, rol, isOperator, isAdmin } = useAuth()
@@ -112,6 +115,15 @@ function AppContent() {
 
       {/* Usuarios — admin+ (super_admin ve todo, admin ve su inst) */}
       {page === 'usuarios' && isAdmin && <UsuariosPage />}
+
+      {/* Productos — admin+ */}
+      {page === 'productos' && isAdmin && <ProductosPage />}
+
+      {/* Categorías — admin+ */}
+      {page === 'categorias' && isAdmin && <CategoriasPage />}
+
+      {/* Registros — admin+ */}
+      {page === 'registros' && isAdmin && <RegistrosPage />}
 
       {/* Instituciones — solo super_admin */}
       {page === 'instituciones' && rol === 'super_admin' && <InstitucionesPage />}

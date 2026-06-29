@@ -83,20 +83,30 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
 
   async function loadGeo(parroquiaId) {
     try {
-      const { data } = await supabase
+      // 1. Traer la parroquia
+      const { data: parroquia } = await supabase
         .from('parroquia')
-        .select('id, municipio_id, municipio:id (id, estado_id)')
+        .select('id, municipio_id')
         .eq('id', parroquiaId)
         .single()
-      if (data) {
-        setEstadoId(data.municipio?.estado_id)
-        const muns = await getMunicipios(data.municipio?.estado_id)
-        setMunicipios(muns)
-        setMunicipioId(data.municipio_id)
-        const parqs = await getParroquias(data.municipio_id)
-        setParroquias(parqs)
-        setParroquiaId(data.id)
-      }
+      if (!parroquia) return
+
+      // 2. Traer el municipio (con su estado_id)
+      const { data: municipio } = await supabase
+        .from('municipio')
+        .select('id, estado_id')
+        .eq('id', parroquia.municipio_id)
+        .single()
+      if (!municipio) return
+
+      // 3. Cargar los selects en cascada
+      setEstadoId(municipio.estado_id)
+      const muns = await getMunicipios(municipio.estado_id)
+      setMunicipios(muns)
+      setMunicipioId(parroquia.municipio_id)
+      const parqs = await getParroquias(parroquia.municipio_id)
+      setParroquias(parqs)
+      setParroquiaId(parroquia.id)
     } catch (err) { console.error(err) }
   }
 
