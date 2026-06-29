@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { LogIn, UserPlus, ScanLine } from 'lucide-react'
+import { LogIn, UserPlus, ScanLine, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -8,7 +8,7 @@ import { SearchSelect } from '@/components/ui/search-select'
 import { signIn } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 import { getInstituciones } from '@/lib/api'
-import { normalizeText } from '@/lib/utils'
+import { cn, normalizeText } from '@/lib/utils'
 import { toast } from 'sonner'
 import Scanner from '@/pages/Scanner'
 
@@ -24,8 +24,21 @@ export default function Login({ onLogin, defaultInstitucionId }) {
   const [nombre, setNombre] = useState('')
   const [apellido, setApellido] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [dispDias, setDispDias] = useState([])
+  const [dispDesde, setDispDesde] = useState('')
+  const [dispHasta, setDispHasta] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const DIAS = [
+    { key: 'L', label: 'Lun' }, { key: 'M', label: 'Mar' }, { key: 'MI', label: 'Mie' },
+    { key: 'J', label: 'Jue' }, { key: 'V', label: 'Vie' }, { key: 'S', label: 'Sab' },
+    { key: 'D', label: 'Dom' },
+  ]
+
+  function toggleDia(key) {
+    setDispDias(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key])
+  }
 
   // El ID de institución a usar (viene de QR o prop)
   const effectiveInstId = localInstId || defaultInstitucionId
@@ -108,14 +121,15 @@ export default function Login({ onLogin, defaultInstitucionId }) {
         telefono: telefono.trim(),
         rol: 'operador',
         institucionId: instId,
+        disponibilidadDias: dispDias.join(','),
+        disponibilidadHoraDesde: dispDesde || null,
+        disponibilidadHoraHasta: dispHasta || null,
       })
       toast.success('Usuario creado — ahora inicia sesión')
       setMode('login')
-      setPassword('')
-      setConfirmPassword('')
-      setNombre('')
-      setApellido('')
-      setTelefono('')
+      setPassword(''); setConfirmPassword('')
+      setNombre(''); setApellido(''); setTelefono('')
+      setDispDias([]); setDispDesde(''); setDispHasta('')
     } catch (err) {
       setError(err.message || 'Error al registrar')
     } finally {
@@ -230,6 +244,42 @@ export default function Login({ onLogin, defaultInstitucionId }) {
               <div className="space-y-2">
                 <Label htmlFor="reg-tel">Teléfono</Label>
                 <Input id="reg-tel" type="tel" placeholder="0412-1234567" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+              </div>
+
+              {/* Disponibilidad */}
+              <div className="space-y-2 border-t border-border/50 pt-3">
+                <Label className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  Disponibilidad horaria
+                </Label>
+                <p className="text-xs text-muted-foreground">Seleccioná los días que podés asistir</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {DIAS.map(d => (
+                    <button
+                      key={d.key}
+                      type="button"
+                      onClick={() => toggleDia(d.key)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-lg text-sm border transition-colors',
+                        dispDias.includes(d.key)
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-secondary text-muted-foreground border-input hover:bg-secondary/80'
+                      )}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <div>
+                    <Label className="text-xs">Desde</Label>
+                    <Input type="time" value={dispDesde} onChange={e => setDispDesde(e.target.value)} className="h-9" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Hasta</Label>
+                    <Input type="time" value={dispHasta} onChange={e => setDispHasta(e.target.value)} className="h-9" />
+                  </div>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="reg-user">Usuario <span className="text-destructive">*</span></Label>

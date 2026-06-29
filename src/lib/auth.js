@@ -11,7 +11,7 @@ import { supabase } from './supabase'
  * Registro: crea usuario en auth.users
  * El perfil en public.usuarios lo crea el trigger on_auth_user_created
  */
-export async function signUp({ username, password, nombre, apellido, telefono, rol, institucionId }) {
+export async function signUp({ username, password, nombre, apellido, telefono, rol, institucionId, disponibilidadDias, disponibilidadHoraDesde, disponibilidadHoraHasta }) {
 
   const email = `${username.toLowerCase().trim()}@acopio.app`
   const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -25,6 +25,9 @@ export async function signUp({ username, password, nombre, apellido, telefono, r
         telefono: telefono || null,
         rol: rol || 'operador',
         institucion_id: institucionId || null,
+        disponibilidad_dias: disponibilidadDias || null,
+        disponibilidad_hora_desde: disponibilidadHoraDesde || null,
+        disponibilidad_hora_hasta: disponibilidadHoraHasta || null,
       },
     },
   })
