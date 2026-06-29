@@ -33,7 +33,6 @@ export default function InventarioPage() {
       const { data } = await query
       setItems(data || [])
     } catch (err) {
-      console.error('[Inventario] error:', err)
     } finally {
       setLoading(false)
     }

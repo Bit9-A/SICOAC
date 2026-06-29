@@ -38,7 +38,6 @@ export default function Dashboard() {
           instituciones: isSuperAdmin ? (instituciones || 0) : 1,
         })
       } catch (err) {
-        console.error('[Dashboard] error:', err)
       }
     }
     load()

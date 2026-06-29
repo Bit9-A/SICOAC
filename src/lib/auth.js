@@ -12,7 +12,6 @@ import { supabase } from './supabase'
  * El perfil en public.usuarios lo crea el trigger on_auth_user_created
  */
 export async function signUp({ username, password, nombre, apellido, telefono, rol, institucionId }) {
-  console.log('[Auth] signUp — registrando usuario:', username)
 
   const email = `${username.toLowerCase().trim()}@acopio.app`
   const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -30,13 +29,11 @@ export async function signUp({ username, password, nombre, apellido, telefono, r
     },
   })
   if (authError) {
-    console.error('[Auth] signUp ERROR:', authError.message)
     throw authError
   }
 
   if (!authData.user) throw new Error('No se pudo crear el usuario')
 
-  console.log('[Auth] signUp OK — usuario creado:', authData.user.id)
   return authData.user
 }
 
@@ -44,16 +41,13 @@ export async function signUp({ username, password, nombre, apellido, telefono, r
  * Inicio de sesión: username + password
  */
 export async function signIn({ username, password }) {
-  console.log('[Auth] signIn — iniciando sesión:', username)
   const email = `${username.toLowerCase().trim()}@acopio.app`
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) {
-    console.error('[Auth] signIn ERROR:', error.message)
     throw error
   }
 
-  console.log('[Auth] signIn OK — usuario:', data.user.id)
   return data.user
 }
 
@@ -61,10 +55,8 @@ export async function signIn({ username, password }) {
  * Cierre de sesión
  */
 export async function signOut() {
-  console.log('[Auth] signOut')
   const { error } = await supabase.auth.signOut()
   if (error) {
-    console.error('[Auth] signOut ERROR:', error.message)
     throw error
   }
 }
@@ -75,10 +67,8 @@ export async function signOut() {
 export async function getSession() {
   const { data, error } = await supabase.auth.getSession()
   if (error) {
-    console.error('[Auth] getSession ERROR:', error.message)
     return null
   }
-  console.log('[Auth] getSession —', data.session ? `activa (${data.session.user.id})` : 'inactiva')
   return data.session
 }
 
@@ -87,17 +77,14 @@ export async function getSession() {
  */
 export async function getProfile(userId) {
   if (!userId) return null
-  console.log('[Auth] getProfile — consultando perfil de:', userId)
   const { data, error } = await supabase
     .from('usuarios')
     .select('*, institucion:institucion_id (id, nombre, direccion)')
     .eq('id', userId)
     .single()
   if (error) {
-    console.error('[Auth] getProfile ERROR:', error.message)
     return null
   }
-  console.log('[Auth] getProfile OK —', data.username)
   return data
 }
 
@@ -106,7 +93,6 @@ export async function getProfile(userId) {
  */
 export function onAuthChange(callback) {
   return supabase.auth.onAuthStateChange((event, session) => {
-    console.log('[Auth] onAuthStateChange — evento:', event, session ? `user=${session.user.id}` : 'sin sesión')
     callback(event, session)
   })
 }

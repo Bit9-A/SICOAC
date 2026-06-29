@@ -10,17 +10,14 @@ export default function Scanner({ onDetected, onClose, onManual }) {
   const [error, setError] = useState(null)
   const [detectedCode, setDetectedCode] = useState(null)
 
-  console.log('[Scanner] componente montado')
 
   // Focus management: Trap focus & Restore focus on unmount
   useEffect(() => {
-    console.log('[Scanner] gestionando foco...')
     const previousActiveElement = document.activeElement
     if (containerRef.current) {
       containerRef.current.focus()
     }
     return () => {
-      console.log('[Scanner] restaurando foco anterior')
       if (previousActiveElement && typeof previousActiveElement.focus === 'function') {
         previousActiveElement.focus()
       }
@@ -31,7 +28,6 @@ export default function Scanner({ onDetected, onClose, onManual }) {
   useEffect(() => {
     function handleKeyDown(e) {
       if (e.key === 'Escape') {
-        console.log('[Scanner] Escape presionado — cerrando')
         handleClose()
       }
     }
@@ -40,12 +36,10 @@ export default function Scanner({ onDetected, onClose, onManual }) {
   }, [onClose])
 
   useEffect(() => {
-    console.log('[Scanner] init — inicializando cámara y detector...')
     let cancelled = false
 
     async function init() {
       if (!isScannerAvailable()) {
-        console.warn('[Scanner] BarcodeDetector no disponible')
         setError('Escáner no disponible en este navegador. Usá ingreso manual.')
         setStatus('error')
         return
@@ -54,27 +48,21 @@ export default function Scanner({ onDetected, onClose, onManual }) {
       try {
         setStatus('requesting')
         await startCamera(videoRef.current)
-        if (cancelled) { console.log('[Scanner] cancelado después de cámara'); stopCamera(); return }
 
         setStatus('scanning')
-        console.log('[Scanner] iniciando bucle de detección...')
         startDetection(videoRef.current, (code) => {
           if (cancelled) return
-          console.log(`[Scanner] código recibido en callback: "${code}"`)
           setDetectedCode(code)
           if (navigator.vibrate) navigator.vibrate(100)
 
           // Esperar un momento para mostrar feedback, luego enviar
-          console.log('[Scanner] feedback visual, redirigiendo al formulario en 500ms...')
           setTimeout(() => {
             if (!cancelled) {
-              console.log(`[Scanner] enviando código "${code}" al formulario`)
               onDetected(code)
             }
           }, 500)
         })
       } catch (err) {
-        console.error('[Scanner] error en init:', err)
         if (!cancelled) {
           setError(err.message)
           setStatus('error')
@@ -84,7 +72,6 @@ export default function Scanner({ onDetected, onClose, onManual }) {
 
     init()
     return () => {
-      console.log('[Scanner] cleanup — cancelando y deteniendo cámara')
       cancelled = true
       stopCamera()
     }

@@ -115,7 +115,6 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
       const parqs = await getParroquias(parroquia.municipio_id)
       setParroquias(parqs)
       setParroquiaId(parroquia.id)
-    } catch (err) { console.error(err) }
   }
 
   // Búsqueda async de códigos de barras
@@ -282,7 +281,6 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
         resetForm()
       }
     } catch (err) {
-      console.error(err)
       toast.error('Error — guardado en cola offline')
       addToQueue({
         institucionId: isTransfer ? institucionOrigenId : institucionId,
