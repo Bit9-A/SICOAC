@@ -3,3 +3,6 @@ dist
 .env
 .DS_Store
 *.local
+.vite
+pnpm-lock.yaml
+pnpm-workspace.yaml
