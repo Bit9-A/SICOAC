@@ -10,11 +10,18 @@ import { toast } from 'sonner'
 
 export default function Home({ onStartScan, onStartManual, sessionCount }) {
   const online = useOnlineStatus()
-  const [queue, setQueue] = useState(getQueue)
+  const [queue, setQueue] = useState(() => {
+    const q = getQueue()
+    console.log(`[Home] estado inicial — cola: ${q.length} pendientes, sesión: ${sessionCount} registros`)
+    return q
+  })
   const [syncing, setSyncing] = useState(false)
 
   useEffect(() => {
-    const onFocus = () => setQueue(getQueue())
+    const onFocus = () => {
+      console.log('[Home] ventana enfocada — refrescando cola...')
+      setQueue(getQueue())
+    }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [])
@@ -22,32 +29,40 @@ export default function Home({ onStartScan, onStartManual, sessionCount }) {
   const refreshQueue = () => setQueue(getQueue())
 
   async function handleSync() {
-    if (!online) { toast.warning('Sin conexión — no se puede sincronizar'); return }
-    if (!isConfigured()) { toast.warning('Configurá las credenciales de Supabase en el .env'); return }
+    console.log('[Home] handleSync — iniciando sincronización manual...')
+    if (!online) { console.warn('[Home] sin conexión, cancelando sync'); toast.warning('Sin conexión — no se puede sincronizar'); return }
+    if (!isConfigured()) { console.warn('[Home] Supabase no configurado, cancelando sync'); toast.warning('Configurá las credenciales de Supabase en el .env'); return }
 
     setSyncing(true)
     const items = getQueue()
+    console.log(`[Home] sincronizando ${items.length} registro(s)...`)
+
     const { ok, fail } = await sendBatch(items, (cur, total) => {
       toast.loading(`Sincronizando ${cur}/${total}...`, { id: 'sync' })
     })
     toast.dismiss('sync')
+    console.log(`[Home] sync completo: ${ok.length} OK, ${fail.length} FAIL`)
 
     if (fail.length === 0) {
+      console.log('[Home] todos los registros sincronizados, limpiando cola')
       clearQueue()
       toast.success(`${ok.length} registro(s) sincronizados`)
     } else {
+      console.warn('[Home] algunos registros fallaron:', fail.map(f => `${f.record.productName}: ${f.error}`))
       fail.forEach(({ record, error }) => {
         toast.error(`Error: ${record.productName} — ${error}`)
       })
       if (ok.length > 0) {
         const okIds = new Set(ok.map(r => r._id))
         const remaining = items.filter(r => !okIds.has(r._id))
-        remaining.forEach(r => clearQueue() || null) // reset
+        // Re-guardar solo los que fallaron
+        remaining.forEach(r => clearQueue() || null)
         remaining.forEach(r => {
           const q = getQueue()
           q.push(r)
           localStorage.setItem('acopio_queue', JSON.stringify(q))
         })
+        console.log(`[Home] ${remaining.length} registro(s) fallidos re-guardados en cola`)
         toast.success(`${ok.length} sincronizados`)
       }
     }
