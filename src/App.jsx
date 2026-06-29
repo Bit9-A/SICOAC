@@ -1,32 +1,28 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Toaster } from 'sonner'
 import { Package } from 'lucide-react'
+import { AuthProvider, useAuth } from '@/context/AuthContext'
 import { getSessionCount } from '@/lib/storage'
-import { isScannerAvailable } from '@/lib/scanner'
-import { initializeDbData } from '@/lib/api'
+import AppLayout from '@/components/layout/AppLayout'
 import Home from '@/pages/Home'
 import Scanner from '@/pages/Scanner'
 import Form from '@/pages/Form'
+import Login from '@/pages/Login'
+import DashboardPage from '@/pages/Dashboard'
+import InventarioPage from '@/pages/Inventario'
+import UsuariosPage from '@/pages/Usuarios'
+import InstitucionesPage from '@/pages/Instituciones'
 
-/* Screen keys */
-const SCREEN = { HOME: 'home', FORM: 'form' }
+function AppContent() {
+  const { user, profile, loading, logout, rol, isOperator, isAdmin } = useAuth()
 
-export default function App() {
-  const [screen, setScreen] = useState(SCREEN.HOME)
+  const [page, setPage] = useState('home')
   const [showScanner, setShowScanner] = useState(false)
   const [barcode, setBarcode] = useState('')
   const [sessionCount, setSessionCount] = useState(getSessionCount)
 
-  const refreshSessionCount = useCallback(() => {
-    setSessionCount(getSessionCount())
-  }, [])
+  const refreshSessionCount = useCallback(() => setSessionCount(getSessionCount()), [])
 
-  // Inicializar geografía y categorías en la base de datos Supabase
-  useEffect(() => {
-    initializeDbData()
-  }, [])
-
-  // Registrar service worker
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch(() => {})
@@ -35,80 +31,105 @@ export default function App() {
 
   const goHome = useCallback(() => {
     setShowScanner(false)
-    setScreen(SCREEN.HOME)
+    setPage('home')
     setBarcode('')
     refreshSessionCount()
   }, [refreshSessionCount])
 
-  const openScan = useCallback(() => {
-    setShowScanner(true)
-  }, [])
-
-  const closeScan = useCallback(() => {
-    setShowScanner(false)
-  }, [])
+  const openScan = useCallback(() => setShowScanner(true), [])
+  const closeScan = useCallback(() => setShowScanner(false), [])
 
   const onDetected = useCallback((code) => {
     setBarcode(code)
     setShowScanner(false)
-    setScreen(SCREEN.FORM)
+    setPage('form')
   }, [])
 
   const onManual = useCallback(() => {
     setShowScanner(false)
-    setScreen(SCREEN.FORM)
+    setPage('form')
   }, [])
 
-  const onOpenManual = useCallback(() => {
-    setScreen(SCREEN.FORM)
+  const onOpenManual = useCallback(() => setPage('form'), [])
+
+  const handleNavigate = useCallback((p) => {
+    setPage(p)
+    setShowScanner(false)
   }, [])
+
+  const handleLogout = useCallback(async () => {
+    await logout()
+  }, [logout])
+
+  // Loading
+  if (loading) {
+    return (
+      <div className="h-dvh flex items-center justify-center bg-background">
+        <div className="text-center space-y-3">
+          <Package className="w-10 h-10 text-primary animate-pulse mx-auto" />
+          <p className="text-sm text-muted-foreground">Cargando...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Login
+  if (!user) return <Login onLogin={() => {}} />
 
   return (
-    <div className="h-dvh flex flex-col bg-background overflow-hidden">
-      {/* Header — solo visible en Home y Form */}
-      {screen !== SCREEN.HOME && !showScanner && (
-        <header className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0 bg-card/50 backdrop-blur-sm">
-          <Package className="w-5 h-5 text-primary" aria-hidden="true" />
-          <h1 className="font-semibold text-sm">Centros de Acopio</h1>
-        </header>
-      )}
-
-      {/* Main content */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden">
-        {screen === SCREEN.HOME && (
-          <Home
-            onStartScan={openScan}
-            onStartManual={onOpenManual}
-            sessionCount={sessionCount}
-          />
-        )}
-
-        {screen === SCREEN.FORM && (
-          <Form
-            barcode={barcode}
-            onBack={goHome}
-            onScanAgain={openScan}
-            onSaved={refreshSessionCount}
-          />
-        )}
-      </main>
-
-      {/* Scanner overlay */}
-      {showScanner && (
-        <Scanner
-          onDetected={onDetected}
-          onClose={closeScan}
-          onManual={onManual}
+    <AppLayout
+      rol={rol}
+      currentPage={page}
+      onNavigate={handleNavigate}
+      onLogout={handleLogout}
+      onOpenScan={openScan}
+    >
+      {/* Home — todos los roles */}
+      {page === 'home' && (
+        <Home
+          onStartScan={openScan}
+          onStartManual={onOpenManual}
+          sessionCount={sessionCount}
         />
       )}
 
-      {/* Sonner toaster */}
-      <Toaster
-        position="top-center"
-        richColors
-        closeButton
-        duration={3000}
-      />
-    </div>
+      {/* Form — todos */}
+      {page === 'form' && (
+        <Form
+          barcode={barcode}
+          onBack={goHome}
+          onScanAgain={openScan}
+          onSaved={refreshSessionCount}
+          userProfile={profile}
+        />
+      )}
+
+      {/* Dashboard — admin+ */}
+      {page === 'dashboard' && isAdmin && <DashboardPage />}
+
+      {/* Inventario — admin+ */}
+      {page === 'inventario' && isAdmin && <InventarioPage />}
+
+      {/* Usuarios — admin+ (super_admin ve todo, admin ve su inst) */}
+      {page === 'usuarios' && isAdmin && <UsuariosPage />}
+
+      {/* Instituciones — solo super_admin */}
+      {page === 'instituciones' && rol === 'super_admin' && <InstitucionesPage />}
+
+      {/* Scanner overlay */}
+      {showScanner && (
+        <Scanner onDetected={onDetected} onClose={closeScan} onManual={onManual} />
+      )}
+
+      <Toaster position="top-center" richColors closeButton duration={3000} />
+    </AppLayout>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   )
 }

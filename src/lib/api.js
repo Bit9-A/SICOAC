@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { CONFIG } from './config'
+import { normalizeText } from './utils'
 
 export async function initializeDbData() {
   if (!isConfigured()) return
@@ -153,7 +154,7 @@ export async function createInstitucion(nombre, direccion, parroquiaId) {
   console.log(`[API] createInstitucion — creando "${nombre}", parroquia_id=${parroquiaId}...`)
   const { data, error } = await supabase
     .from('institucion')
-    .insert([{ nombre, direccion, parroquia_id: parroquiaId }])
+    .insert([{ nombre: normalizeText(nombre), direccion: normalizeText(direccion), parroquia_id: parroquiaId }])
     .select()
   if (error) {
     console.error('[API] createInstitucion ERROR:', error.message, { nombre, direccion, parroquiaId })
@@ -178,7 +179,7 @@ export async function createCategoria(nombre) {
   console.log(`[API] createCategoria — creando "${nombre}"...`)
   const { data, error } = await supabase
     .from('categoria')
-    .insert([{ nombre }])
+    .insert([{ nombre: normalizeText(nombre) }])
     .select()
   if (error) {
     console.error('[API] createCategoria ERROR:', error.message, { nombre })
@@ -255,9 +256,8 @@ export async function sendRecord(record) {
     const { error: updErr } = await supabase
       .from('producto')
       .update({
-        nombre: record.productName || existingProduct.productName,
-        descripcion: record.description || existingProduct.description,
-        presentacion: record.presentation || existingProduct.presentation,
+        nombre: normalizeText(record.productName) || existingProduct.productName,
+        descripcion: normalizeText(record.description) || existingProduct.description,
         categoria_id: finalCategoryId,
       })
       .eq('id', finalProductId)
@@ -270,9 +270,8 @@ export async function sendRecord(record) {
       .from('producto')
       .insert([
         {
-          nombre: record.productName,
-          descripcion: record.description || '',
-          presentacion: record.presentation || '',
+          nombre: normalizeText(record.productName),
+          descripcion: normalizeText(record.description || ''),
           categoria_id: finalCategoryId,
           institucion_id: record.institucionId || null,
         },

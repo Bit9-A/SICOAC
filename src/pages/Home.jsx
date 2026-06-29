@@ -1,73 +1,53 @@
 import { useState, useEffect } from 'react'
-import { ScanLine, ClipboardList, Clock, WifiOff, Upload } from 'lucide-react'
+import { ScanLine, Clock, WifiOff, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { getQueue, clearQueue } from '@/lib/storage'
 import { sendBatch, isConfigured } from '@/lib/api'
 import { useOnlineStatus } from '@/hooks/useOnlineStatus'
+import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 
 export default function Home({ onStartScan, onStartManual, sessionCount }) {
   const online = useOnlineStatus()
-  const [queue, setQueue] = useState(() => {
-    const q = getQueue()
-    console.log(`[Home] estado inicial — cola: ${q.length} pendientes, sesión: ${sessionCount} registros`)
-    return q
-  })
+  const { rol, profile } = useAuth()
+  const [queue, setQueue] = useState(getQueue)
   const [syncing, setSyncing] = useState(false)
+  const isOperator = rol === 'operador'
 
   useEffect(() => {
-    const onFocus = () => {
-      console.log('[Home] ventana enfocada — refrescando cola...')
-      setQueue(getQueue())
-    }
+    const onFocus = () => setQueue(getQueue())
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [])
 
-  const refreshQueue = () => setQueue(getQueue())
-
   async function handleSync() {
-    console.log('[Home] handleSync — iniciando sincronización manual...')
-    if (!online) { console.warn('[Home] sin conexión, cancelando sync'); toast.warning('Sin conexión — no se puede sincronizar'); return }
-    if (!isConfigured()) { console.warn('[Home] Supabase no configurado, cancelando sync'); toast.warning('Configurá las credenciales de Supabase en el .env'); return }
-
+    if (!online) { toast.warning('Sin conexión'); return }
+    if (!isConfigured()) { toast.warning('Configurá Supabase en el .env'); return }
     setSyncing(true)
     const items = getQueue()
-    console.log(`[Home] sincronizando ${items.length} registro(s)...`)
-
     const { ok, fail } = await sendBatch(items, (cur, total) => {
       toast.loading(`Sincronizando ${cur}/${total}...`, { id: 'sync' })
     })
     toast.dismiss('sync')
-    console.log(`[Home] sync completo: ${ok.length} OK, ${fail.length} FAIL`)
-
     if (fail.length === 0) {
-      console.log('[Home] todos los registros sincronizados, limpiando cola')
       clearQueue()
       toast.success(`${ok.length} registro(s) sincronizados`)
     } else {
-      console.warn('[Home] algunos registros fallaron:', fail.map(f => `${f.record.productName}: ${f.error}`))
-      fail.forEach(({ record, error }) => {
-        toast.error(`Error: ${record.productName} — ${error}`)
-      })
+      fail.forEach(({ record, error }) => toast.error(`${record.productName}: ${error}`))
       if (ok.length > 0) {
         const okIds = new Set(ok.map(r => r._id))
         const remaining = items.filter(r => !okIds.has(r._id))
-        // Re-guardar solo los que fallaron
         remaining.forEach(r => clearQueue() || null)
         remaining.forEach(r => {
-          const q = getQueue()
-          q.push(r)
+          const q = getQueue(); q.push(r)
           localStorage.setItem('acopio_queue', JSON.stringify(q))
         })
-        console.log(`[Home] ${remaining.length} registro(s) fallidos re-guardados en cola`)
-        toast.success(`${ok.length} sincronizados`)
       }
     }
     setSyncing(false)
-    refreshQueue()
+    setQueue(getQueue())
   }
 
   return (
@@ -77,74 +57,64 @@ export default function Home({ onStartScan, onStartManual, sessionCount }) {
         {/* Hero */}
         <div className="text-center space-y-3 pb-2">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-2">
-            <ScanLine className="w-8 h-8 text-primary" aria-hidden="true" />
+            <ScanLine className="w-8 h-8 text-primary" />
           </div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
             Centros de Acopio
           </h1>
-          <p className="text-muted-foreground text-sm md:text-base max-w-sm mx-auto">
-            Escaneá el código de barras para registrar lo que llega al centro
-          </p>
+          {profile && (
+            <p className="text-sm text-muted-foreground">
+              {profile.nombre} {profile.apellido}
+              {profile.institucion && <span> — {profile.institucion.nombre}</span>}
+            </p>
+          )}
         </div>
 
-        {/* Actions */}
-        <div className="space-y-3">
-          <Button size="lg" className="w-full gap-3 text-base" onClick={onStartScan}>
-            <ScanLine className="w-5 h-5" aria-hidden="true" />
-            Escanear Código
-          </Button>
-          <Button variant="secondary" size="lg" className="w-full gap-3 text-base" onClick={onStartManual}>
-            <ClipboardList className="w-5 h-5" aria-hidden="true" />
-            Ingreso Manual
-          </Button>
-        </div>
+        {/* Big action button */}
+        <Button size="lg" className="w-full gap-3 text-base h-14" onClick={onStartScan}>
+          <ScanLine className="w-6 h-6" />
+          {isOperator ? 'Registrar Entrada' : 'Registrar Producto'}
+        </Button>
 
         {/* Connection badge */}
         <div className="flex justify-center">
           <Badge variant={online ? 'success' : 'warning'} className="gap-1.5 px-3 py-1">
-            <span className={`w-1.5 h-1.5 rounded-full ${online ? 'bg-emerald-600' : 'bg-amber-600'}`} aria-hidden="true" />
+            <span className={`w-1.5 h-1.5 rounded-full ${online ? 'bg-emerald-600' : 'bg-amber-600'}`} />
             {online ? 'Conectado' : 'Sin conexión'}
           </Badge>
         </div>
 
-        {/* Stats card */}
+        {/* Stats */}
         <Card className="p-4 md:p-5">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 shrink-0">
-              <Clock className="w-5 h-5 text-primary" aria-hidden="true" />
+              <Clock className="w-5 h-5 text-primary" />
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Registrados en esta sesión</p>
-              <p className="text-2xl font-bold tabular-nums">{sessionCount}</p>
+              <p className="text-2xl font-bold">{sessionCount}</p>
             </div>
           </div>
         </Card>
 
-        {/* Queue card */}
+        {/* Queue */}
         {queue.length > 0 && (
           <Card className="p-4 md:p-5 border-amber-500/30">
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-amber-500/10 shrink-0">
-                <WifiOff className="w-5 h-5 text-amber-600" aria-hidden="true" />
+                <WifiOff className="w-5 h-5 text-amber-600" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-muted-foreground">Pendientes de sincronizar</p>
-                <p className="text-2xl font-bold tabular-nums">{queue.length}</p>
+                <p className="text-2xl font-bold">{queue.length}</p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0 gap-1.5"
-                onClick={handleSync}
-                disabled={syncing || !online}
-              >
-                <Upload className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} aria-hidden="true" />
+              <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={handleSync} disabled={syncing || !online}>
+                <Upload className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
                 {syncing ? '...' : 'Sincronizar'}
               </Button>
             </div>
           </Card>
         )}
-
       </div>
     </div>
   )

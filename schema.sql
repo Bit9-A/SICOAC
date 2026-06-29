@@ -136,7 +136,25 @@ create trigger update_movimiento_updated_at
   before update on public.movimiento
   for each row execute function public.update_updated_at_column();
 
--- 11. Security Policies (RLS)
+-- 11. Usuarios Table (profiles linked to auth.users)
+create table public.usuarios (
+  id uuid references auth.users(id) on delete cascade primary key,
+  username text unique not null,
+  nombre text not null,
+  apellido text not null,
+  telefono text,
+  rol text not null default 'operador' check (rol in ('super_admin', 'admin', 'operador')),
+  activo boolean not null default true,
+  institucion_id bigint references public.institucion(id) on delete set null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create trigger update_usuarios_updated_at
+  before update on public.usuarios
+  for each row execute function public.update_updated_at_column();
+
+-- 12. Security Policies (RLS)
 -- Enables Row Level Security for all tables
 alter table public.estado enable row level security;
 alter table public.municipio enable row level security;
@@ -147,6 +165,7 @@ alter table public.tipo_movimiento enable row level security;
 alter table public.producto enable row level security;
 alter table public.producto_codigo enable row level security;
 alter table public.movimiento enable row level security;
+alter table public.usuarios enable row level security;
 
 -- Public read policies
 create policy "Allow public read" on public.estado for select using (true);
@@ -158,6 +177,11 @@ create policy "Allow public read" on public.tipo_movimiento for select using (tr
 create policy "Allow public read" on public.producto for select using (true);
 create policy "Allow public read" on public.producto_codigo for select using (true);
 create policy "Allow public read" on public.movimiento for select using (true);
+
+-- User-specific policies (authenticated users see/update only their own profile)
+create policy "Users view own profile" on public.usuarios for select using (auth.uid() = id);
+create policy "Users insert own profile" on public.usuarios for insert with check (auth.uid() = id);
+create policy "Users update own profile" on public.usuarios for update using (auth.uid() = id);
 
 -- Public write policies for transactions
 create policy "Allow public insert" on public.movimiento for insert with check (true);
