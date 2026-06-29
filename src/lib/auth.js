@@ -2,22 +2,32 @@
  * Auth service — autenticación contra Supabase Auth
  *
  * Usa username como si fuera email: {username}@acopio.app
- * El perfil se guarda en la tabla public.usuarios vinculada a auth.users
+ * El perfil se crea automáticamente via DB trigger (on_auth_user_created)
+ * que lee los metadatos enviados en options.data.
  */
 import { supabase } from './supabase'
 
 /**
- * Registro: crea usuario en auth.users + perfil en usuarios
+ * Registro: crea usuario en auth.users
+ * El perfil en public.usuarios lo crea el trigger on_auth_user_created
  */
-export async function signUp({ username, password, nombre, apellido, telefono, institucionId }) {
+export async function signUp({ username, password, nombre, apellido, telefono, rol, institucionId }) {
   console.log('[Auth] signUp — registrando usuario:', username)
 
-  // 1. Crear usuario en Supabase Auth (email = username + dominio)
   const email = `${username.toLowerCase().trim()}@acopio.app`
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { username, nombre, apellido } },
+    options: {
+      data: {
+        username: username.toLowerCase().trim(),
+        nombre,
+        apellido,
+        telefono: telefono || null,
+        rol: rol || 'operador',
+        institucion_id: institucionId || null,
+      },
+    },
   })
   if (authError) {
     console.error('[Auth] signUp ERROR:', authError.message)
@@ -25,22 +35,6 @@ export async function signUp({ username, password, nombre, apellido, telefono, i
   }
 
   if (!authData.user) throw new Error('No se pudo crear el usuario')
-
-  // 2. Crear perfil en public.usuarios
-  const { error: profileError } = await supabase.from('usuarios').insert({
-    id: authData.user.id,
-    username: username.toLowerCase().trim(),
-    nombre,
-    apellido,
-    telefono: telefono || null,
-    institucion_id: institucionId || null,
-  })
-  if (profileError) {
-    console.error('[Auth] signUp — error creando perfil:', profileError.message)
-    // Intenta limpiar el auth user si falló el perfil
-    await supabase.auth.admin?.deleteUser?.(authData.user.id)
-    throw profileError
-  }
 
   console.log('[Auth] signUp OK — usuario creado:', authData.user.id)
   return authData.user

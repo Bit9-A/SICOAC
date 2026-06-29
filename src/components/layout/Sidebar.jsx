@@ -1,28 +1,34 @@
 import { useState } from 'react'
 import {
   LayoutDashboard, Package, ClipboardList, Users, Building2, Settings, LogOut,
-  ScanLine, ChevronLeft, Menu
+  ScanLine, ChevronLeft, Menu, ShoppingBag, Tags, Sun, Moon
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTheme } from '@/hooks/useTheme'
 
 const NAV_ITEMS = {
   super_admin: [
-    { id: 'dashboard',  label: 'Dashboard',    icon: LayoutDashboard },
-    { id: 'inventario', label: 'Inventario',   icon: Package },
-    { id: 'registros',  label: 'Registros',    icon: ClipboardList },
-    { id: 'usuarios',   label: 'Usuarios',     icon: Users },
-    { id: 'instituciones', label: 'Instituciones', icon: Building2 },
+    { id: 'dashboard',     label: 'Dashboard',     icon: LayoutDashboard },
+    { id: 'inventario',    label: 'Inventario',    icon: Package },
+    { id: 'registros',     label: 'Registros',     icon: ClipboardList },
+    { id: 'productos',     label: 'Productos',     icon: ShoppingBag },
+    { id: 'categorias',    label: 'Categorías',    icon: Tags },
+    { id: 'usuarios',      label: 'Usuarios',      icon: Users },
+    { id: 'instituciones', label: 'Instituciones',  icon: Building2 },
   ],
   admin: [
-    { id: 'dashboard',  label: 'Dashboard',    icon: LayoutDashboard },
-    { id: 'inventario', label: 'Inventario',   icon: Package },
-    { id: 'registros',  label: 'Registros',    icon: ClipboardList },
-    { id: 'usuarios',   label: 'Usuarios',     icon: Users },
+    { id: 'dashboard',     label: 'Dashboard',     icon: LayoutDashboard },
+    { id: 'inventario',    label: 'Inventario',    icon: Package },
+    { id: 'registros',     label: 'Registros',     icon: ClipboardList },
+    { id: 'productos',     label: 'Productos',     icon: ShoppingBag },
+    { id: 'categorias',    label: 'Categorías',    icon: Tags },
+    { id: 'usuarios',      label: 'Usuarios',      icon: Users },
   ],
 }
 
 export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpenScan }) {
   const [collapsed, setCollapsed] = useState(false)
+  const { theme, toggle } = useTheme()
   const items = NAV_ITEMS[rol] || NAV_ITEMS.admin
 
   return (
@@ -86,8 +92,15 @@ export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpen
           })}
         </nav>
 
-        {/* User info + logout */}
-        <div className="p-2 border-t border-border">
+        {/* Theme toggle + logout */}
+        <div className="p-2 border-t border-border space-y-1">
+          <button
+            onClick={toggle}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+          >
+            {theme === 'dark' ? <Sun className="w-5 h-5 shrink-0" /> : <Moon className="w-5 h-5 shrink-0" />}
+            {!collapsed && <span>{theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}</span>}
+          </button>
           <button
             onClick={onLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-secondary hover:text-destructive transition-colors"

@@ -4,25 +4,48 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 224 71.4% 4.1%;
-    --card: 0 0% 100%;
-    --card-foreground: 224 71.4% 4.1%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 224 71.4% 4.1%;
-    --primary: 348 83% 47%;
+    --background: 240 10% 6%;
+    --foreground: 0 0% 93%;
+    --card: 240 10% 14%;
+    --card-foreground: 0 0% 93%;
+    --popover: 240 10% 14%;
+    --popover-foreground: 0 0% 93%;
+    --primary: 348 73% 58%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 40%;
+    --secondary: 240 6% 23%;
+    --secondary-foreground: 0 0% 93%;
+    --muted: 240 6% 23%;
+    --muted-foreground: 240 5% 55%;
+    --accent: 172 80% 34%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 4% 26%;
+    --input: 240 4% 26%;
+    --ring: 348 73% 58%;
+    --radius: 0.75rem;
+  }
+
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 10%;
+    --card: 0 0% 96%;
+    --card-foreground: 240 10% 10%;
+    --popover: 0 0% 96%;
+    --popover-foreground: 240 10% 10%;
+    --primary: 348 73% 48%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 90%;
+    --secondary-foreground: 240 10% 10%;
+    --muted: 240 5% 90%;
+    --muted-foreground: 240 5% 45%;
     --accent: 172 80% 30%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 84.2% 60%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 348 83% 47%;
+    --destructive: 0 84% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 5% 82%;
+    --input: 240 5% 82%;
+    --ring: 348 73% 48%;
     --radius: 0.75rem;
   }
 }
@@ -44,6 +67,15 @@ img {
   body {
     @apply bg-background text-foreground;
   }
+
+  select {
+    @apply bg-secondary text-foreground;
+    color-scheme: dark;
+  }
+
+  .light select {
+    color-scheme: light;
+  }
 }
 
 /* Custom scrollbar */
@@ -62,10 +94,21 @@ img {
 .scan-frame {
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
 }
+.light .scan-frame {
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
+}
 
 /* Toast overrides for sonner */
 [data-sonner-toaster] {
   --normal-bg: hsl(var(--card)) !important;
   --normal-text: hsl(var(--foreground)) !important;
   --normal-border: hsl(var(--border)) !important;
+}
+
+/* Light mode scanner overlay */
+.light .scanner-top-bar {
+  background: rgba(255,255,255,0.9) !important;
+}
+.light .scanner-bottom-bar {
+  background: rgba(255,255,255,0.9) !important;
 }
