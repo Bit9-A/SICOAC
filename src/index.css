@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 10% 6%;
+    --foreground: 0 0% 93%;
+    --card: 240 10% 14%;
+    --card-foreground: 0 0% 93%;
+    --popover: 240 10% 14%;
+    --popover-foreground: 0 0% 93%;
+    --primary: 348 73% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 6% 20%;
+    --secondary-foreground: 0 0% 93%;
+    --muted: 240 6% 20%;
+    --muted-foreground: 240 5% 55%;
+    --accent: 172 80% 34%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 6% 20%;
+    --input: 240 6% 20%;
+    --ring: 348 73% 58%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+
+/* Scan frame highlight overlay */
+.scan-frame {
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+}
+
+/* Toast overrides for sonner */
+[data-sonner-toaster] {
+  --normal-bg: hsl(var(--card)) !important;
+  --normal-text: hsl(var(--foreground)) !important;
+  --normal-border: hsl(var(--border)) !important;
+}
