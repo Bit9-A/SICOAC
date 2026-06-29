@@ -292,7 +292,7 @@ export async function sendRecord(record) {
   })
 
   if (!isConfigured()) {
-    throw new Error('Credenciales de Supabase no configuradas. Creá un archivo .env con VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY')
+    throw new Error('Credenciales de Supabase no configuradas. Crea un archivo .env con VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY')
   }
 
   // 1. Resolve Category ID (create on the fly if categoryId is text)
@@ -377,13 +377,15 @@ export async function sendRecord(record) {
   console.log(`[API] sendRecord — tipo_movimiento id=${tipoMovimientoId}`)
 
   // 4. Log Movement Transaction
+  const isTransferencia = record.tipoMovimiento === 'Transferencia'
   const movementPayload = {
     producto_id: finalProductId,
     cantidad: Number(record.quantity) || 1,
     unidad: record.presentation || 'unidades',
-    institucion_origen_id: record.tipoMovimiento === 'Salida' ? record.institucionId : null,
-    institucion_destino_id: record.tipoMovimiento === 'Entrada' ? record.institucionId : null,
+    institucion_origen_id: isTransferencia ? record.institucionOrigenId : (record.tipoMovimiento === 'Salida' ? record.institucionId : null),
+    institucion_destino_id: isTransferencia ? record.institucionDestinoId : (record.tipoMovimiento === 'Entrada' ? record.institucionId : null),
     tipo_movimiento_id: tipoMovimientoId,
+    estado: isTransferencia ? 'enviado' : 'completado',
   }
 
   console.log('[API] sendRecord — insertando movimiento:', movementPayload)
@@ -398,6 +400,24 @@ export async function sendRecord(record) {
   }
   console.log(`[API] sendRecord — MOVIMIENTO REGISTRADO EXITOSAMENTE ✅ id=${movData[0].id}`)
   return movData[0]
+}
+
+export async function recibirTransferencia(movimientoId) {
+  console.log('[API] recibirTransferencia — marcando como recibido:', movimientoId)
+  const { data, error } = await supabase
+    .from('movimiento')
+    .update({ estado: 'recibido', recibido_por: (await supabase.auth.getUser()).data.user?.id })
+    .eq('id', movimientoId)
+    .eq('estado', 'enviado')
+    .select()
+
+  if (error) {
+    console.error('[API] recibirTransferencia ERROR:', error.message)
+    throw error
+  }
+  if (!data || data.length === 0) throw new Error('Transferencia no encontrada o ya fue recibida')
+  console.log('[API] recibirTransferencia OK — id:', movimientoId)
+  return data[0]
 }
 
 export async function sendBatch(records, onProgress) {
@@ -417,6 +437,98 @@ export async function sendBatch(records, onProgress) {
   }
   console.log(`[API] sendBatch — completo: ${ok.length} OK, ${fail.length} FAIL`)
   return { ok, fail }
+}
+
+// ============================================================
+// DESPACHOS (guías de carga)
+// ============================================================
+
+export async function crearDespacho({ institucionOrigenId, institucionDestinoId, transportista, vehiculo, placa, notas, productos }) {
+  console.log(`[API] crearDespacho — ${productos.length} producto(s), transportista: ${transportista}`)
+
+  // 1. Crear cabecera del despacho
+  const { data: desp, error: despErr } = await supabase
+    .from('despacho')
+    .insert({
+      institucion_origen_id: institucionOrigenId,
+      institucion_destino_id: institucionDestinoId || null,
+      transportista,
+      vehiculo,
+      placa: placa || null,
+      notas: notas || null,
+      created_by: (await supabase.auth.getUser()).data.user?.id,
+    })
+    .select()
+  if (despErr) throw despErr
+  const despachoId = desp[0].id
+
+  // 2. Para cada producto, obtener/resolver producto y crear movimiento
+  for (const prod of productos) {
+    // Buscar producto por nombre
+    let productoId = prod.id
+    if (!productoId) {
+      const { data: found } = await supabase
+        .from('producto')
+        .select('id')
+        .ilike('nombre', prod.nombre.trim())
+        .limit(1)
+      if (found && found.length > 0) {
+        productoId = found[0].id
+      } else {
+        // Crear producto
+        const { data: newProd } = await supabase
+          .from('producto')
+          .insert({ nombre: normalizeText(prod.nombre), categoria_id: prod.categoryId || 1 })
+          .select()
+        if (!newProd) continue
+        productoId = newProd[0].id
+      }
+    }
+
+    // Crear movimiento (Salida) vinculado al despacho
+    const { error: movErr } = await supabase
+      .from('movimiento')
+      .insert({
+        producto_id: productoId,
+        cantidad: Number(prod.cantidad) || 1,
+        unidad: prod.unidad || 'unidades',
+        institucion_origen_id: institucionOrigenId,
+        institucion_destino_id: institucionDestinoId || null,
+        tipo_movimiento_id: (await supabase.from('tipo_movimiento').select('id').eq('nombre', 'Salida').single()).data.id,
+        despacho_id: despachoId,
+        estado: 'completado',
+      })
+    if (movErr) console.error(`[API] crearDespacho — error en movimiento ${prod.nombre}:`, movErr.message)
+  }
+
+  console.log(`[API] crearDespacho OK — id=${despachoId}`)
+  return desp[0]
+}
+
+export async function getDespachos() {
+  const { data } = await supabase
+    .from('despacho')
+    .select('*, institucion_origen:institucion_origen_id (nombre), institucion_destino:institucion_destino_id (nombre)')
+    .order('created_at', { ascending: false })
+    .limit(50)
+  return data || []
+}
+
+export async function getDespachoConMovimientos(id) {
+  const { data: desp } = await supabase
+    .from('despacho')
+    .select('*, institucion_origen:institucion_origen_id (nombre), institucion_destino:institucion_destino_id (nombre)')
+    .eq('id', id)
+    .single()
+  if (!desp) throw new Error('Despacho no encontrado')
+
+  const { data: movs } = await supabase
+    .from('movimiento')
+    .select('*, producto:producto_id (nombre, presentacion)')
+    .eq('despacho_id', id)
+    .order('id')
+
+  return { ...desp, movimientos: movs || [] }
 }
 
 export function isConfigured() {

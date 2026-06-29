@@ -15,6 +15,8 @@ import InstitucionesPage from '@/pages/Instituciones'
 import ProductosPage from '@/pages/Productos'
 import CategoriasPage from '@/pages/Categorias'
 import RegistrosPage from '@/pages/Registros'
+import DespachosPage from '@/pages/Despachos'
+import QrRegistroPage from '@/pages/QrRegistro'
 
 function AppContent() {
   const { user, profile, loading, logout, rol, isOperator, isAdmin } = useAuth()
@@ -23,6 +25,18 @@ function AppContent() {
   const [showScanner, setShowScanner] = useState(false)
   const [barcode, setBarcode] = useState('')
   const [sessionCount, setSessionCount] = useState(getSessionCount)
+  const [qrInstId, setQrInstId] = useState(null)
+
+  // Leer ?inst= de la URL (para registro por QR)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const inst = params.get('inst')
+    if (inst) setQrInstId(inst)
+    // Limpiar params sin recargar
+    if (params.has('inst') || params.has('register')) {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   const refreshSessionCount = useCallback(() => setSessionCount(getSessionCount()), [])
 
@@ -77,7 +91,7 @@ function AppContent() {
   }
 
   // Login
-  if (!user) return <Login onLogin={() => {}} />
+  if (!user) return <Login onLogin={() => {}} defaultInstitucionId={qrInstId} />
 
   return (
     <AppLayout
@@ -124,6 +138,12 @@ function AppContent() {
 
       {/* Registros — admin+ */}
       {page === 'registros' && isAdmin && <RegistrosPage />}
+
+      {/* Despachos — admin+ */}
+      {page === 'despachos' && isAdmin && <DespachosPage />}
+
+      {/* QR Registro — admin+ */}
+      {page === 'qr' && isAdmin && <QrRegistroPage />}
 
       {/* Instituciones — solo super_admin */}
       {page === 'instituciones' && rol === 'super_admin' && <InstitucionesPage />}

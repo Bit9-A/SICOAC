@@ -47,7 +47,7 @@ export default function ProductosPage() {
 
   async function handleCreate(e) {
     e.preventDefault()
-    if (!newNombre.trim() || !newCatId) return toast.warning('Completá nombre y categoría')
+    if (!newNombre.trim() || !newCatId) return toast.warning('Completa nombre y categoría')
 
     // Crear producto
     const { data: prod, error } = await supabase.from('producto').insert({

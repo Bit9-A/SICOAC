@@ -15,6 +15,7 @@ export function SearchSelect({
   onSearch,       // (query: string) => void — se llama al escribir, desactiva filtro interno
   searching,      // bool — muestra spinner de búsqueda
   showValueAsText,// bool — si no hay option que matchee el value, muestra el value como texto
+  error,          // bool — muestra borde rojo de error
 }) {
   const [open, setOpen]           = useState(false)
   const [query, setQuery]         = useState('')
@@ -191,7 +192,8 @@ export function SearchSelect({
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
           className={cn(
-            'flex h-10 w-full rounded-lg border border-input bg-secondary px-3 py-2 text-sm ring-offset-background',
+            'flex h-10 w-full rounded-lg border bg-secondary px-3 py-2 text-sm ring-offset-background',
+            error ? 'border-destructive' : 'border-input',
             'placeholder:text-muted-foreground',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
             'disabled:cursor-not-allowed disabled:opacity-50',

@@ -14,6 +14,7 @@ export function CreateSelect({
   displayValue,
   className,
   id,
+  error,
 }) {
   const [open, setOpen]               = useState(false)
   const [query, setQuery]             = useState('')
@@ -210,7 +211,8 @@ export function CreateSelect({
         onClick={() => setOpen(!open)}
         onKeyDown={handleKeyDown}
         className={cn(
-          'flex h-10 w-full items-center justify-between rounded-lg border border-input bg-secondary px-3 py-2 text-sm',
+          'flex h-10 w-full items-center justify-between rounded-lg border bg-secondary px-3 py-2 text-sm',
+          error ? 'border-destructive' : 'border-input',
           'hover:bg-secondary/80',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
           'disabled:cursor-not-allowed disabled:opacity-50',

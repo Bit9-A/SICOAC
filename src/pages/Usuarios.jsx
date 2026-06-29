@@ -41,6 +41,7 @@ export default function UsuariosPage() {
   const [telefono, setTelefono] = useState('')
   const [rol, setRol] = useState('operador')
   const [instId, setInstId] = useState('')
+  const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
 
   useEffect(() => { loadUsuarios(); loadInstituciones() }, [])
@@ -60,12 +61,29 @@ export default function UsuariosPage() {
 
   async function handleCreate(e) {
     e.preventDefault()
-    if (!username.trim() || !password || !nombre.trim() || !apellido.trim()) return toast.warning('Completá campos obligatorios')
+    const newErrors = {}
+    const normNombre = normalizeText(nombre)
+    const normApellido = normalizeText(apellido)
+    const normUsername = username.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    const normTel = telefono.trim()
+
+    if (!normNombre) newErrors.nombre = 'El nombre es obligatorio'
+    if (!normApellido) newErrors.apellido = 'El apellido es obligatorio'
+    if (!normUsername) newErrors.username = 'El usuario es obligatorio'
+    else if (normUsername.length < 3) newErrors.username = 'Mínimo 3 caracteres'
+    else if (!/^[a-z0-9._]+$/.test(normUsername)) newErrors.username = 'Solo letras, números, puntos y guion bajo'
+    if (!password) newErrors.password = 'La contraseña es obligatoria'
+    else if (password.length < 6) newErrors.password = 'Mínimo 6 caracteres'
+    if (!instId) newErrors.instId = 'La institución es obligatoria'
+
+    setErrors(newErrors)
+    if (Object.keys(newErrors).length > 0) return toast.warning('Corrige los campos marcados')
+
     setLoading(true)
     try {
-      await signUp({ username: username.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''), password, nombre: normalizeText(nombre), apellido: normalizeText(apellido), telefono: telefono.trim(), rol, institucionId: instId || null })
+      await signUp({ username: normUsername, password, nombre: normNombre, apellido: normApellido, telefono: normTel, rol, institucionId: instId || null })
       toast.success('Usuario creado')
-      setShowForm(false); setUsername(''); setPassword(''); setNombre(''); setApellido(''); setTelefono(''); setRol('operador'); setInstId('')
+      setShowForm(false); setUsername(''); setPassword(''); setNombre(''); setApellido(''); setTelefono(''); setRol('operador'); setInstId(''); setErrors({})
       loadUsuarios()
     } catch (err) { toast.error(err.message) } finally { setLoading(false) }
   }
@@ -100,18 +118,38 @@ export default function UsuariosPage() {
           <h3 className="font-semibold">Crear Usuario</h3>
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Nombre *</Label><Input value={nombre} onChange={e => setNombre(e.target.value)} /></div>
-              <div className="space-y-2"><Label>Apellido *</Label><Input value={apellido} onChange={e => setApellido(e.target.value)} /></div>
-              <div className="space-y-2"><Label>Usuario *</Label><Input value={username} onChange={e => setUsername(e.target.value)} /></div>
-              <div className="space-y-2"><Label>Contraseña *</Label><Input type="password" value={password} onChange={e => setPassword(e.target.value)} /></div>
-              <div className="space-y-2"><Label>Teléfono</Label><Input value={telefono} onChange={e => setTelefono(e.target.value)} /></div>
+              <div className="space-y-2">
+                <Label>Nombre *</Label>
+                <Input value={nombre} onChange={e => setNombre(normalizeText(e.target.value))} className={errors.nombre ? 'border-destructive' : ''} placeholder="Ej: MARIA" />
+                {errors.nombre && <p className="text-xs text-destructive">{errors.nombre}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label>Apellido *</Label>
+                <Input value={apellido} onChange={e => setApellido(normalizeText(e.target.value))} className={errors.apellido ? 'border-destructive' : ''} placeholder="Ej: PEREZ" />
+                {errors.apellido && <p className="text-xs text-destructive">{errors.apellido}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label>Usuario *</Label>
+                <Input value={username} onChange={e => setUsername(e.target.value)} className={errors.username ? 'border-destructive' : ''} placeholder="ej: mariaperez" />
+                {errors.username && <p className="text-xs text-destructive">{errors.username}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label>Contraseña *</Label>
+                <Input type="password" value={password} onChange={e => setPassword(e.target.value)} className={errors.password ? 'border-destructive' : ''} placeholder="Mínimo 6 caracteres" />
+                {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label>Teléfono</Label>
+                <Input value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="0412-1234567" />
+              </div>
               <div className="space-y-2">
                 <Label>Rol *</Label>
                 <SearchSelect options={ROLES} value={rol} onChange={setRol} placeholder="Seleccionar..." />
               </div>
               <div className="space-y-2">
                 <Label>Institución *</Label>
-                <SearchSelect options={instituciones} value={instId} onChange={setInstId} placeholder="Seleccionar..." />
+                <SearchSelect options={instituciones} value={instId} onChange={val => { setInstId(val); if (errors.instId) setErrors(p => ({...p, instId: null})) }} placeholder="Seleccionar..." error={!!errors.instId} />
+                {errors.instId && <p className="text-xs text-destructive">{errors.instId}</p>}
               </div>
             </div>
             <Button type="submit" disabled={loading}>{loading ? 'Creando...' : 'Crear Usuario'}</Button>

@@ -1,15 +1,23 @@
-import { useState } from 'react'
-import { Package, LogIn, UserPlus } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { LogIn, UserPlus, ScanLine } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
+import { SearchSelect } from '@/components/ui/search-select'
 import { signIn } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
+import { getInstituciones } from '@/lib/api'
 import { normalizeText } from '@/lib/utils'
 import { toast } from 'sonner'
+import Scanner from '@/pages/Scanner'
 
-export default function Login({ onLogin }) {
-  const [mode, setMode] = useState('login') // login | register
+export default function Login({ onLogin, defaultInstitucionId }) {
+  const [mode, setMode] = useState(defaultInstitucionId ? 'register' : 'login')
+  const [instituciones, setInstituciones] = useState([])
+  const [instLabel, setInstLabel] = useState('')
+  const [localInstId, setLocalInstId] = useState(defaultInstitucionId || '')
+  const [showScanner, setShowScanner] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -19,11 +27,43 @@ export default function Login({ onLogin }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // El ID de institución a usar (viene de QR o prop)
+  const effectiveInstId = localInstId || defaultInstitucionId
+
+  // Cargar datos de la institución (vía QR o prop)
+  useEffect(() => {
+    if (effectiveInstId) {
+      getInstituciones().then(insts => {
+        setInstituciones(insts)
+        const found = insts.find(i => String(i.value) === String(effectiveInstId))
+        if (found) setInstLabel(found.label)
+      })
+    }
+  }, [effectiveInstId])
+
+  // QR detectado desde el escáner
+  function handleQrDetected(code) {
+    setShowScanner(false)
+    try {
+      const url = new URL(code.startsWith('http') ? code : `https://${code}`)
+      const inst = url.searchParams.get('inst')
+      if (inst) {
+        setLocalInstId(inst)
+        setMode('register')
+        toast.success('Código QR detectado')
+      } else {
+        toast.error('El código no contiene una institución válida')
+      }
+    } catch {
+      toast.error('Código QR no válido')
+    }
+  }
+
   async function handleLogin(e) {
     e.preventDefault()
     setError('')
     if (!username.trim() || !password) {
-      setError('Completá usuario y contraseña')
+      setError('Completa usuario y contraseña')
       return
     }
     setLoading(true)
@@ -43,7 +83,7 @@ export default function Login({ onLogin }) {
     setError('')
 
     if (!username.trim() || !password || !nombre.trim() || !apellido.trim()) {
-      setError('Completá todos los campos obligatorios')
+      setError('Completa todos los campos obligatorios')
       return
     }
     if (password.length < 6) {
@@ -59,15 +99,17 @@ export default function Login({ onLogin }) {
     try {
       // Dynamic import para no cargar signUp siempre
       const { signUp } = await import('@/lib/auth')
+      const instId = effectiveInstId || null
       await signUp({
         username: username.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
         password,
         nombre: normalizeText(nombre),
         apellido: normalizeText(apellido),
         telefono: telefono.trim(),
-        institucionId: null,
+        rol: 'operador',
+        institucionId: instId,
       })
-      toast.success('Usuario creado — ahora iniciá sesión')
+      toast.success('Usuario creado — ahora inicia sesión')
       setMode('login')
       setPassword('')
       setConfirmPassword('')
@@ -93,7 +135,7 @@ export default function Login({ onLogin }) {
           </div>
           <h1 className="text-xl font-bold">Centros de Acopio</h1>
           <p className="text-sm text-muted-foreground">
-            {mode === 'login' ? 'Iniciá sesión para continuar' : 'Creá tu cuenta'}
+            {mode === 'login' ? 'Inicia sesión para continuar' : !effectiveInstId ? 'Registro para operadores' : 'Completa tus datos'}
           </p>
         </div>
 
@@ -129,18 +171,52 @@ export default function Login({ onLogin }) {
               </Button>
 
               <p className="text-sm text-center text-muted-foreground">
-                ¿No tenés cuenta?{' '}
+                ¿No tienes cuenta?{' '}
                 <button
                   type="button"
                   onClick={() => { setMode('register'); setError('') }}
                   className="text-primary hover:underline font-medium"
                 >
-                  Registrate
+                  Regístrate
                 </button>
               </p>
             </form>
+          ) : !effectiveInstId ? (
+            /* Paso 1: Escanear QR */
+            <div className="space-y-6 py-4">
+              <div className="text-center space-y-2">
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+                  <ScanLine className="w-8 h-8 text-primary" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Escanea el código QR del administrador del centro de acopio para registrarte
+                </p>
+              </div>
+              <Button type="button" size="lg" className="w-full gap-2" onClick={() => setShowScanner(true)}>
+                <ScanLine className="w-4 h-4" />
+                Escanear código QR
+              </Button>
+              <p className="text-sm text-center text-muted-foreground">
+                ¿Ya tienes cuenta?{' '}
+                <button
+                  type="button"
+                  onClick={() => { setMode('login'); setError('') }}
+                  className="text-primary hover:underline font-medium"
+                >
+                  Iniciar sesión
+                </button>
+              </p>
+            </div>
           ) : (
+            /* Paso 2: Formulario después del QR */
             <form onSubmit={handleRegister} className="space-y-4">
+              {instLabel && (
+                <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 text-sm space-y-1">
+                  <p className="font-medium text-primary">Registro para:</p>
+                  <p className="text-foreground">{instLabel}</p>
+                  <p className="text-xs text-muted-foreground">Se registrará como Operador</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="reg-nombre">Nombre <span className="text-destructive">*</span></Label>
@@ -165,7 +241,7 @@ export default function Login({ onLogin }) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="reg-confirm">Confirmar contraseña <span className="text-destructive">*</span></Label>
-                <Input id="reg-confirm" type="password" placeholder="Repetí la contraseña" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+                <Input id="reg-confirm" type="password" placeholder="Repite la contraseña" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
               </div>
 
               {error && <p className="text-sm text-destructive">{error}</p>}
@@ -176,7 +252,7 @@ export default function Login({ onLogin }) {
               </Button>
 
               <p className="text-sm text-center text-muted-foreground">
-                ¿Ya tenés cuenta?{' '}
+                ¿Ya tienes cuenta?{' '}
                 <button
                   type="button"
                   onClick={() => { setMode('login'); setError('') }}
@@ -193,6 +269,15 @@ export default function Login({ onLogin }) {
           App para registro en centros de acopio
         </p>
       </div>
+
+      {/* QR Scanner overlay */}
+      {showScanner && (
+        <Scanner
+          onDetected={handleQrDetected}
+          onClose={() => setShowScanner(false)}
+          onManual={() => setShowScanner(false)}
+        />
+      )}
     </div>
   )
 }

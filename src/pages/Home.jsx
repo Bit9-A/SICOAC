@@ -24,7 +24,7 @@ export default function Home({ onStartScan, onStartManual, sessionCount }) {
 
   async function handleSync() {
     if (!online) { toast.warning('Sin conexión'); return }
-    if (!isConfigured()) { toast.warning('Configurá Supabase en el .env'); return }
+    if (!isConfigured()) { toast.warning('Configura Supabase en el .env'); return }
     setSyncing(true)
     const items = getQueue()
     const { ok, fail } = await sendBatch(items, (cur, total) => {

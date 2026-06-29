@@ -38,6 +38,8 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
   const [parroquiaId, setParroquiaId] = useState('')
 
   const [institucionId, setInstitucionId] = useState(isOperator ? String(userInstId || '') : '')
+  const [institucionOrigenId, setInstitucionOrigenId] = useState(isOperator ? String(userInstId || '') : '')
+  const [institucionDestinoId, setInstitucionDestinoId] = useState('')
   const [newInstitucionNombre, setNewInstitucionNombre] = useState('')
   const [direccion, setDireccion] = useState('')
   const [tipoMovimiento, setTipoMovimiento] = useState('Entrada')
@@ -74,8 +76,8 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
       setInstituciones(insts)
       setCategorias(cats)
 
-      // Auto-select institution for operator
-      if (isOperator && userInstId) {
+      // Auto-select institution del usuario (operador o admin)
+      if (userInstId) {
         const userInst = insts.find(i => String(i.value) === String(userInstId))
         if (userInst) {
           setInstitucionId(String(userInst.value))
@@ -206,7 +208,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
 
   function validateStep1() {
     const e = {}
-    if (!institucionId) e.institucionId = 'Seleccioná o creá una institución'
+    if (!institucionId) e.institucionId = 'Selecciona o crea una institución'
     else if (institucionId === 'new') {
       if (!newInstitucionNombre.trim()) e.institucionId = 'Nombre obligatorio'
       if (!estadoId) e.estadoId = 'Estado obligatorio'
@@ -220,7 +222,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
 
   function handleNextStep() {
     if (validateStep1()) { setStep(2); setTimeout(() => quantityRef.current?.focus(), 100) }
-    else toast.warning('Completá los datos de la institución')
+    else toast.warning('Completa los datos de la institución')
   }
 
   async function handleSubmit(e) {
@@ -229,23 +231,37 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     if (!product.trim()) newErrors.product = 'El producto es obligatorio'
     if (!categoryId) newErrors.categoryId = 'La categoría es obligatoria'
     const qty = Number(quantity)
-    if (!quantity || quantity.trim() === '' || isNaN(qty) || qty <= 0) newErrors.quantity = 'Ingresá una cantidad positiva'
-    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); toast.warning('Corregí los campos marcados'); return }
+    if (!quantity || quantity.trim() === '' || isNaN(qty) || qty <= 0) newErrors.quantity = 'Ingresa una cantidad positiva'
+
+    const isTransfer = tipoMovimiento === 'Transferencia'
+    if (isTransfer) {
+      if (!institucionOrigenId) newErrors.institucionOrigenId = 'Selecciona el origen'
+      if (!institucionDestinoId) newErrors.institucionDestinoId = 'Selecciona el destino'
+      if (institucionOrigenId && institucionDestinoId && institucionOrigenId === institucionDestinoId) {
+        newErrors.institucionDestinoId = 'El destino debe ser diferente al origen'
+      }
+    } else {
+      if (!institucionId) newErrors.institucionId = 'Selecciona una institución'
+    }
+
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); toast.warning('Corrige los campos marcados'); return }
 
     setErrors({})
     setSaving(true)
     try {
       let finalInstId = institucionId
-      if (institucionId === 'new') {
+      if (!isTransfer && institucionId === 'new') {
         const newInst = await createInstitucion(newInstitucionNombre, direccion, parroquiaId)
         finalInstId = newInst.value
         const updated = await getInstituciones(); setInstituciones(updated)
       }
 
       const record = {
-        institucionId: finalInstId,
+        institucionId: isTransfer ? institucionOrigenId : finalInstId,
+        institucionOrigenId: isTransfer ? institucionOrigenId : null,
+        institucionDestinoId: isTransfer ? institucionDestinoId : null,
         direccion: normalizeText(direccion),
-        tipoMovimiento: isOperator ? 'Entrada' : tipoMovimiento,
+        tipoMovimiento: isTransfer ? 'Transferencia' : (isOperator ? 'Entrada' : tipoMovimiento),
         barcode: barcode.trim(),
         productName: normalizeText(product),
         description: normalizeText(description),
@@ -262,14 +278,17 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
       } else {
         addToQueue(record)
         incrementSessionCount()
-        toast.success(`${product} guardado — ${online ? 'configurá Supabase' : 'modo offline'}`)
+        toast.success(`${product} guardado — ${online ? 'configura Supabase' : 'modo offline'}`)
         resetForm()
       }
     } catch (err) {
       console.error(err)
       toast.error('Error — guardado en cola offline')
       addToQueue({
-        institucionId, tipoMovimiento: isOperator ? 'Entrada' : tipoMovimiento,
+        institucionId: isTransfer ? institucionOrigenId : institucionId,
+        institucionOrigenId: isTransfer ? institucionOrigenId : null,
+        institucionDestinoId: isTransfer ? institucionDestinoId : null,
+        tipoMovimiento: isTransfer ? 'Transferencia' : (isOperator ? 'Entrada' : tipoMovimiento),
         barcode: barcode.trim(), productName: normalizeText(product),
         description: normalizeText(description), quantity: qty, categoryId,
         presentation: presentation || 'unidades',
@@ -293,6 +312,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
       setInstitucionId(''); setNewInstitucionNombre(''); setDireccion('')
       setEstadoId(''); setMunicipioId(''); setParroquiaId('')
       setMunicipios([]); setParroquias([])
+      setInstitucionDestinoId('')
     }
     setTimeout(() => quantityRef.current?.focus(), 100)
   }
@@ -318,8 +338,8 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             {isOperator
-              ? 'Registrá los productos que llegan al centro de acopio'
-              : step === 1 ? 'Paso 1: Identificá el centro de acopio' : 'Paso 2: Completá los datos del movimiento'
+              ? 'Registra los productos que llegan al centro de acopio'
+              : step === 1 ? 'Paso 1: Identifica el centro de acopio' : 'Paso 2: Completa los datos del movimiento'
             }
           </p>
         </div>
@@ -376,7 +396,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
               </>
             )}
 
-            {!institucionId && <p className="text-sm text-muted-foreground text-center py-4">Seleccioná o creá una institución</p>}
+            {!institucionId && <p className="text-sm text-muted-foreground text-center py-4">Selecciona o crea una institución</p>}
 
             <Button type="button" size="lg" className="w-full gap-2" onClick={handleNextStep}>
               Siguiente <ChevronRight className="w-5 h-5" />
@@ -388,19 +408,42 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
         {step === 2 && (
           <form onSubmit={handleSubmit} className="space-y-6">
 
-            {/* Institution summary */}
-            <Card className="p-3 border-border/60 bg-card">
-              <div className="flex items-center gap-2 text-sm">
-                <Building className="w-4 h-4 text-primary shrink-0" />
-                <span className="font-medium truncate">
-                  {isOperator
-                    ? (userProfile?.institucion?.nombre || 'Mi institución')
-                    : (isNewInstitution ? newInstitucionNombre : selectedInstitution?.label)
-                  }
-                </span>
-                {!isOperator && <span className="text-muted-foreground truncate">— {direccion}</span>}
+            {/* Institution summary / Transferencia selects */}
+            {tipoMovimiento === 'Transferencia' ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Origen *</Label>
+                  <SearchSelect
+                    options={instituciones.filter(i => String(i.value) !== String(institucionDestinoId))}
+                    value={institucionOrigenId}
+                    onChange={setInstitucionOrigenId}
+                    placeholder="Seleccionar origen..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Destino *</Label>
+                  <SearchSelect
+                    options={instituciones.filter(i => String(i.value) !== String(institucionOrigenId))}
+                    value={institucionDestinoId}
+                    onChange={setInstitucionDestinoId}
+                    placeholder="Seleccionar destino..."
+                  />
+                </div>
               </div>
-            </Card>
+            ) : (
+              <Card className="p-3 border-border/60 bg-card">
+                <div className="flex items-center gap-2 text-sm">
+                  <Building className="w-4 h-4 text-primary shrink-0" />
+                  <span className="font-medium truncate">
+                    {isOperator
+                      ? (userProfile?.institucion?.nombre || 'Mi institución')
+                      : (isNewInstitution ? newInstitucionNombre : selectedInstitution?.label)
+                    }
+                  </span>
+                  {!isOperator && <span className="text-muted-foreground truncate">— {direccion}</span>}
+                </div>
+              </Card>
+            )}
 
             {/* Movement type */}
             <Card className="p-4 md:p-5 space-y-4">
@@ -415,12 +458,15 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
                   <span className="text-muted-foreground">— Solo registro de entradas</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <Button type="button" variant={tipoMovimiento === 'Entrada' ? 'default' : 'outline'} onClick={() => setTipoMovimiento('Entrada')} className="gap-2">
                     <ArrowDownCircle className="w-4 h-4" /> Entrada
                   </Button>
                   <Button type="button" variant={tipoMovimiento === 'Salida' ? 'default' : 'outline'} onClick={() => setTipoMovimiento('Salida')} className="gap-2">
                     <ArrowUpCircle className="w-4 h-4" /> Salida
+                  </Button>
+                  <Button type="button" variant={tipoMovimiento === 'Transferencia' ? 'default' : 'outline'} onClick={() => { setTipoMovimiento('Transferencia'); setStep(2) }} className="gap-2">
+                    <ArrowUpCircle className="w-4 h-4" /> Transferencia
                   </Button>
                 </div>
               )}
@@ -444,7 +490,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
                     onSearch={handleBarcodeSearch}
                     searching={barcodeSearching}
                     placeholder="Escanear o escribir..."
-                    emptyMessage={barcode?.trim().length >= 2 ? 'Sin resultados — podés escribir un código nuevo' : 'Escribí al menos 2 dígitos'}
+                    emptyMessage={barcode?.trim().length >= 2 ? 'Sin resultados — puedes escribir un código nuevo' : 'Escribe al menos 2 dígitos'}
                     showValueAsText
                     className="flex-1"
                   />
@@ -461,8 +507,8 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
                   onChange={handleProductChange}
                   onSearch={handleProductSearch}
                   searching={productSearching}
-                  placeholder="Escribí el nombre del producto..."
-                  emptyMessage={product?.trim().length >= 2 ? 'Sin resultados' : 'Escribí al menos 2 caracteres'}
+                  placeholder="Escribe el nombre del producto..."
+                  emptyMessage={product?.trim().length >= 2 ? 'Sin resultados' : 'Escribe al menos 2 caracteres'}
                   showValueAsText
                 />
                 {errors.product && <p className="text-xs text-destructive">{errors.product}</p>}
