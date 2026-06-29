@@ -3,6 +3,7 @@ import { Toaster } from 'sonner'
 import { Package } from 'lucide-react'
 import { getSessionCount } from '@/lib/storage'
 import { isScannerAvailable } from '@/lib/scanner'
+import { initializeDbData } from '@/lib/api'
 import Home from '@/pages/Home'
 import Scanner from '@/pages/Scanner'
 import Form from '@/pages/Form'
@@ -18,6 +19,11 @@ export default function App() {
 
   const refreshSessionCount = useCallback(() => {
     setSessionCount(getSessionCount())
+  }, [])
+
+  // Inicializar geografía y categorías en la base de datos Supabase
+  useEffect(() => {
+    initializeDbData()
   }, [])
 
   // Registrar service worker

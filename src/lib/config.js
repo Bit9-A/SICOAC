@@ -1,5 +1,6 @@
 export const CONFIG = {
-  APPS_SCRIPT_URL: import.meta.env.VITE_GS_URL || '',
+  SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || '',
+  SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
   BARCODE_FORMATS: [
     'ean_13', 'ean_8', 'code_128', 'code_39', 'code_93',
     'codabar', 'upc_a', 'upc_e', 'itf',

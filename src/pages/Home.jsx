@@ -23,7 +23,7 @@ export default function Home({ onStartScan, onStartManual, sessionCount }) {
 
   async function handleSync() {
     if (!online) { toast.warning('Sin conexión — no se puede sincronizar'); return }
-    if (!isConfigured()) { toast.warning('Configurá VITE_GS_URL en el .env'); return }
+    if (!isConfigured()) { toast.warning('Configurá las credenciales de Supabase en el .env'); return }
 
     setSyncing(true)
     const items = getQueue()
