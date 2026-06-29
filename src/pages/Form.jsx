@@ -115,6 +115,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
       const parqs = await getParroquias(parroquia.municipio_id)
       setParroquias(parqs)
       setParroquiaId(parroquia.id)
+    } catch (err) { /* ignore */ }
   }
 
   // Búsqueda async de códigos de barras

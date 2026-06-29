@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Users, UserPlus, ShieldCheck, Shield, User, Pencil, X, Check, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Users, UserPlus, ShieldCheck, Shield, User, Pencil, X, Check, ToggleLeft, ToggleRight, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -11,7 +11,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { getInstituciones } from '@/lib/api'
 import { signUp } from '@/lib/auth'
-import { normalizeText } from '@/lib/utils'
+import { cn, normalizeText } from '@/lib/utils'
 import { toast } from 'sonner'
 
 const ROLES = [
@@ -41,8 +41,21 @@ export default function UsuariosPage() {
   const [telefono, setTelefono] = useState('')
   const [rol, setRol] = useState('operador')
   const [instId, setInstId] = useState('')
+  const [dispDias, setDispDias] = useState([])
+  const [dispDesde, setDispDesde] = useState('')
+  const [dispHasta, setDispHasta] = useState('')
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
+
+  const DIAS = [
+    { key: 'L', label: 'Lun' }, { key: 'M', label: 'Mar' }, { key: 'MI', label: 'Mie' },
+    { key: 'J', label: 'Jue' }, { key: 'V', label: 'Vie' }, { key: 'S', label: 'Sab' },
+    { key: 'D', label: 'Dom' },
+  ]
+
+  function toggleDia(key) {
+    setDispDias(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key])
+  }
 
   useEffect(() => { loadUsuarios(); loadInstituciones() }, [])
 
@@ -81,9 +94,9 @@ export default function UsuariosPage() {
 
     setLoading(true)
     try {
-      await signUp({ username: normUsername, password, nombre: normNombre, apellido: normApellido, telefono: normTel, rol, institucionId: instId || null })
+      await signUp({ username: normUsername, password, nombre: normNombre, apellido: normApellido, telefono: normTel, rol, institucionId: instId || null, disponibilidadDias: dispDias.join(','), disponibilidadHoraDesde: dispDesde || null, disponibilidadHoraHasta: dispHasta || null })
       toast.success('Usuario creado')
-      setShowForm(false); setUsername(''); setPassword(''); setNombre(''); setApellido(''); setTelefono(''); setRol('operador'); setInstId(''); setErrors({})
+      setShowForm(false); setUsername(''); setPassword(''); setNombre(''); setApellido(''); setTelefono(''); setRol('operador'); setInstId(''); setDispDias([]); setDispDesde(''); setDispHasta(''); setErrors({})
       loadUsuarios()
     } catch (err) { toast.error(err.message) } finally { setLoading(false) }
   }
@@ -145,6 +158,36 @@ export default function UsuariosPage() {
               <div className="space-y-2">
                 <Label>Rol *</Label>
                 <SearchSelect options={ROLES} value={rol} onChange={setRol} placeholder="Seleccionar..." />
+              </div>
+              <div className="space-y-2 md:col-span-2 border-t border-border/50 pt-3">
+                <Label className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  Disponibilidad horaria
+                </Label>
+                <p className="text-xs text-muted-foreground">Días disponibles</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {DIAS.map(d => (
+                    <button key={d.key} type="button" onClick={() => toggleDia(d.key)}
+                      className={cn('px-3 py-1.5 rounded-lg text-sm border transition-colors',
+                        dispDias.includes(d.key)
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-secondary text-muted-foreground border-input hover:bg-secondary/80'
+                      )}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <div>
+                    <Label className="text-xs">Desde</Label>
+                    <Input type="time" value={dispDesde} onChange={e => setDispDesde(e.target.value)} className="h-9" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Hasta</Label>
+                    <Input type="time" value={dispHasta} onChange={e => setDispHasta(e.target.value)} className="h-9" />
+                  </div>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>Institución *</Label>

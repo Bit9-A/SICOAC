@@ -244,13 +244,6 @@ export async function findProductByBarcode(barcode) {
 }
 
 export async function sendRecord(record) {
-    producto: record.productName,
-    barcode: record.barcode,
-    tipo: record.tipoMovimiento,
-    cantidad: record.quantity,
-    institucion: record.institucionId,
-  })
-
   if (!isConfigured()) {
     throw new Error('Credenciales de Supabase no configuradas. Crea un archivo .env con VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY')
   }
