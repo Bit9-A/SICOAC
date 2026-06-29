@@ -163,3 +163,41 @@ create policy "Allow public read" on public.movimiento for select using (true);
 create policy "Allow public insert" on public.movimiento for insert with check (true);
 create policy "Allow public insert" on public.producto for insert with check (true);
 create policy "Allow public insert" on public.producto_codigo for insert with check (true);
+create policy "Allow public insert" on public.categoria for insert with check (true);
+create policy "Allow public insert" on public.institucion for insert with check (true);
+create policy "Allow public insert" on public.estado for insert with check (true);
+create policy "Allow public insert" on public.municipio for insert with check (true);
+create policy "Allow public insert" on public.parroquia for insert with check (true);
+create policy "Allow public insert" on public.tipo_movimiento for insert with check (true);
+
+-- 12. Seed Initial Geography, Categories and Movement Types
+insert into public.estado (nombre) values 
+('Distrito Capital'),
+('Miranda'),
+('Zulia')
+on conflict (nombre) do nothing;
+
+insert into public.municipio (nombre, estado_id) values
+('Libertador', (select id from public.estado where nombre = 'Distrito Capital')),
+('Chacao', (select id from public.estado where nombre = 'Miranda')),
+('Maracaibo', (select id from public.estado where nombre = 'Zulia'))
+on conflict (nombre, estado_id) do nothing;
+
+insert into public.parroquia (nombre, municipio_id) values
+('Catedral', (select id from public.municipio where nombre = 'Libertador' and estado_id = (select id from public.estado where nombre = 'Distrito Capital'))),
+('Chacao', (select id from public.municipio where nombre = 'Chacao' and estado_id = (select id from public.estado where nombre = 'Miranda'))),
+('Olegario Villalobos', (select id from public.municipio where nombre = 'Maracaibo' and estado_id = (select id from public.estado where nombre = 'Zulia')))
+on conflict (nombre, municipio_id) do nothing;
+
+insert into public.categoria (nombre) values
+('Nutrición y alimentos'),
+('Salud y Farmacia'),
+('Higiene y sanitarios'),
+('Refugio'),
+('Textil y vestimenta')
+on conflict (nombre) do nothing;
+
+insert into public.tipo_movimiento (nombre) values
+('Entrada'),
+('Salida')
+on conflict (nombre) do nothing;
