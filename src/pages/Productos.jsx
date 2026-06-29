@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ShoppingBag, Search, Plus, Pencil, Trash2, X, Check } from 'lucide-react'
+import { ShoppingBag, Search, Plus, Pencil, Trash2, X, Check, Barcode } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,12 +22,19 @@ export default function ProductosPage() {
   const [newNombre, setNewNombre] = useState('')
   const [newDesc, setNewDesc] = useState('')
   const [newCatId, setNewCatId] = useState('')
+  const [newBarcode, setNewBarcode] = useState('')
+
+  // Barcode editing state (per-product)
+  const [newBarcodeInput, setNewBarcodeInput] = useState('')
 
   useEffect(() => { load() }, [])
 
   async function load() {
     const [prods, cats] = await Promise.all([
-      supabase.from('producto').select('*, categoria:categoria_id (nombre)').order('nombre'),
+      supabase
+        .from('producto')
+        .select('*, categoria:categoria_id (nombre), producto_codigo (id, codigo)')
+        .order('nombre'),
       getCategorias()
     ])
     setProductos(prods.data || [])
@@ -41,14 +48,27 @@ export default function ProductosPage() {
   async function handleCreate(e) {
     e.preventDefault()
     if (!newNombre.trim() || !newCatId) return toast.warning('Completá nombre y categoría')
-    const { error } = await supabase.from('producto').insert({
+
+    // Crear producto
+    const { data: prod, error } = await supabase.from('producto').insert({
       nombre: normalizeText(newNombre),
       descripcion: normalizeText(newDesc),
-      categoria_id: newCatId
-    })
+      categoria_id: newCatId,
+    }).select()
     if (error) return toast.error(error.message)
+
+    // Si hay código de barras, asociarlo
+    if (newBarcode.trim()) {
+      const { error: bcErr } = await supabase.from('producto_codigo').insert({
+        producto_id: prod[0].id,
+        codigo: newBarcode.trim(),
+      })
+      if (bcErr) toast.error(`Producto creado, pero error con código: ${bcErr.message}`)
+    }
+
     toast.success('Producto creado')
-    setShowNew(false); setNewNombre(''); setNewDesc(''); setNewCatId('')
+    setShowNew(false)
+    setNewNombre(''); setNewDesc(''); setNewCatId(''); setNewBarcode('')
     load()
   }
 
@@ -73,11 +93,28 @@ export default function ProductosPage() {
     load()
   }
 
+  async function handleAddBarcode(productoId) {
+    const codigo = newBarcodeInput.trim()
+    if (!codigo) return
+    const { error } = await supabase.from('producto_codigo').insert({ producto_id: productoId, codigo })
+    if (error) return toast.error(error.message)
+    toast.success('Código agregado')
+    setNewBarcodeInput('')
+    load()
+  }
+
+  async function handleRemoveBarcode(barcodeId) {
+    const { error } = await supabase.from('producto_codigo').delete().eq('id', barcodeId)
+    if (error) return toast.error(error.message)
+    load()
+  }
+
   function startEdit(p) {
     setEditId(p.id)
     setEditNombre(p.nombre)
     setEditDesc(p.descripcion || '')
     setEditCatId(String(p.categoria_id))
+    setNewBarcodeInput('')
   }
 
   return (
@@ -98,10 +135,17 @@ export default function ProductosPage() {
             <div className="space-y-2"><Label>Descripción</Label><Input value={newDesc} onChange={e => setNewDesc(e.target.value)} /></div>
             <div className="space-y-2">
               <Label>Categoría *</Label>
-              <select value={newCatId} onChange={e => setNewCatId(e.target.value)} className="flex h-10 w-full rounded-lg border border-input bg-secondary px-3 py-2 text-sm">
+              <select value={newCatId} onChange={e => setNewCatId(e.target.value)} className="flex h-10 w-full rounded-lg border border-input bg-secondary pl-3 py-2 text-sm">
                 <option value="">Seleccionar...</option>
                 {categorias.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
               </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Código de barras</Label>
+              <Input
+                value={newBarcode} onChange={e => setNewBarcode(e.target.value)}
+                inputMode="numeric" placeholder="Opcional"
+              />
             </div>
             <div className="md:col-span-3 flex gap-2">
               <Button type="submit">Crear Producto</Button>
@@ -132,12 +176,56 @@ export default function ProductosPage() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Categoría</Label>
-                    <select value={editCatId} onChange={e => setEditCatId(e.target.value)} className="flex h-10 w-full rounded-lg border border-input bg-secondary px-3 py-2 text-sm">
+                    <select value={editCatId} onChange={e => setEditCatId(e.target.value)} className="flex h-10 w-full rounded-lg border border-input bg-secondary pl-3 py-2 text-sm">
                       {categorias.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                     </select>
                   </div>
                 </div>
-                <div className="flex gap-2">
+
+                {/* Barcode management in edit */}
+                <div className="border-t border-border/50 pt-3">
+                  <Label className="text-xs mb-2 block">Códigos de barras</Label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {(p.producto_codigo || []).map(bc => (
+                      <Badge key={bc.id} variant="secondary" className="gap-1.5 pr-1">
+                        <Barcode className="w-3 h-3" />
+                        {bc.codigo}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveBarcode(bc.id)}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                    {(p.producto_codigo || []).length === 0 && (
+                      <span className="text-xs text-muted-foreground">Sin códigos</span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      value={newBarcodeInput}
+                      onChange={e => setNewBarcodeInput(e.target.value)}
+                      inputMode="numeric"
+                      placeholder="Agregar código..."
+                      className="h-8 text-xs"
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddBarcode(p.id) } }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 gap-1 text-xs"
+                      disabled={!newBarcodeInput.trim()}
+                      onClick={() => handleAddBarcode(p.id)}
+                    >
+                      <Plus className="w-3 h-3" /> Agregar
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-1">
                   <Button size="sm" onClick={() => handleSave(p.id)} className="gap-1"><Check className="w-3.5 h-3.5" /> Guardar</Button>
                   <Button size="sm" variant="outline" onClick={() => setEditId(null)} className="gap-1"><X className="w-3.5 h-3.5" /> Cancelar</Button>
                 </div>
@@ -150,6 +238,20 @@ export default function ProductosPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{p.nombre}</p>
                   <p className="text-sm text-muted-foreground truncate">{p.descripcion || '—'}</p>
+                  {/* Show barcodes inline */}
+                  {(p.producto_codigo || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {(p.producto_codigo || []).slice(0, 4).map(bc => (
+                        <span key={bc.id} className="inline-flex items-center gap-1 text-xs bg-secondary/60 px-1.5 py-0.5 rounded">
+                          <Barcode className="w-2.5 h-2.5" />
+                          {bc.codigo}
+                        </span>
+                      ))}
+                      {(p.producto_codigo || []).length > 4 && (
+                        <span className="text-xs text-muted-foreground">+{p.producto_codigo.length - 4}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <Badge variant="secondary">{p.categoria?.nombre || '—'}</Badge>
                 <div className="flex gap-1 shrink-0">

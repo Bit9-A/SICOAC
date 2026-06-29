@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { ArrowLeft, ScanLine, Save, Building, ArrowDownCircle, ArrowUpCircle, ShoppingBag, Check, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,7 +9,8 @@ import { SearchSelect } from '@/components/ui/search-select'
 import { CreateSelect } from '@/components/ui/create-select'
 import {
   sendRecord, isConfigured, getEstados, getMunicipios, getParroquias,
-  getInstituciones, createInstitucion, getCategorias, createCategoria, findProductByBarcode
+  getInstituciones, createInstitucion, getCategorias, createCategoria,
+  searchBarcodes, searchProducts, findProductByBarcode,
 } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { addToQueue, incrementSessionCount } from '@/lib/storage'
@@ -21,7 +22,7 @@ import { toast } from 'sonner'
 export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onSaved, userProfile }) {
   const online = useOnlineStatus()
   const { rol, institucionId: userInstId } = useAuth()
-  const productInputRef = useRef(null)
+  const quantityRef = useRef(null)
   const isOperator = rol === 'operador'
 
   const [step, setStep] = useState(isOperator ? 2 : 1)
@@ -42,10 +43,15 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
   const [tipoMovimiento, setTipoMovimiento] = useState('Entrada')
 
   const [barcode, setBarcode] = useState(initialBarcode || '')
+  const [barcodeOptions, setBarcodeOptions] = useState([])
+  const [barcodeSearching, setBarcodeSearching] = useState(false)
   const [product, setProduct] = useState('')
+  const [productOptions, setProductOptions] = useState([])
+  const [productSearching, setProductSearching] = useState(false)
   const [description, setDescription] = useState('')
   const [categoryId, setCategoryId] = useState('')
-  const [quantity, setQuantity] = useState(1)
+  const [presentation, setPresentation] = useState('')
+  const [quantity, setQuantity] = useState('')
 
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState({})
@@ -110,23 +116,72 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     } catch (err) { console.error(err) }
   }
 
-  useEffect(() => { if (initialBarcode) setBarcode(initialBarcode) }, [initialBarcode])
+  // Búsqueda async de códigos de barras
+  const handleBarcodeSearch = useCallback(async (query) => {
+    setBarcode(query) // tracking del texto aunque no haya selección
+    if (!query || query.trim().length < 2) { setBarcodeOptions([]); return }
+    setBarcodeSearching(true)
+    try {
+      const results = await searchBarcodes(query)
+      setBarcodeOptions(results)
+    } finally { setBarcodeSearching(false) }
+  }, [])
 
+  // Selección de un resultado del dropdown de código
+  const handleBarcodeChange = useCallback((val) => {
+    setBarcode(val)
+    const found = barcodeOptions.find(o => o.value === val)
+    if (found) {
+      setProduct(found.productName)
+      setDescription(found.description || '')
+      setCategoryId(found.categoryId)
+      setPresentation(found.presentation || '')
+      toast.info(`Producto autocompletado: ${found.productName}`)
+      setTimeout(() => quantityRef.current?.focus(), 100)
+    }
+  }, [barcodeOptions])
+
+  // Si viene un código escaneado, hacer la búsqueda inicial
   useEffect(() => {
-    async function checkBarcode() {
-      if (barcode?.trim().length >= 3) {
-        const prod = await findProductByBarcode(barcode)
+    if (initialBarcode) {
+      setBarcode(initialBarcode)
+      handleBarcodeSearch(initialBarcode)
+      // Búsqueda exacta para auto-completar
+      findProductByBarcode(initialBarcode).then(prod => {
         if (prod) {
           setProduct(prod.productName)
           setDescription(prod.description || '')
           setCategoryId(prod.categoryId)
+          setPresentation(prod.presentation || '')
           toast.info(`Producto autocompletado: ${prod.productName}`)
-          productInputRef.current?.focus()
+          setTimeout(() => quantityRef.current?.focus(), 100)
         }
-      }
+      })
     }
-    checkBarcode()
-  }, [barcode])
+  }, [initialBarcode])
+
+  // Búsqueda async de productos por nombre
+  const handleProductSearch = useCallback(async (query) => {
+    if (!query || query.trim().length < 2) { setProductOptions([]); return }
+    setProductSearching(true)
+    try {
+      const results = await searchProducts(query)
+      setProductOptions(results)
+    } finally { setProductSearching(false) }
+  }, [])
+
+  // Selección de producto desde el dropdown
+  const handleProductChange = useCallback((val) => {
+    const found = productOptions.find(o => o.value === val)
+    if (found) {
+      setProduct(found.productName)
+      setDescription(found.description || '')
+      setCategoryId(found.categoryId)
+      setPresentation(found.presentation || '')
+      toast.info(`Producto seleccionado: ${found.productName}`)
+      setTimeout(() => quantityRef.current?.focus(), 100)
+    }
+  }, [productOptions])
 
   /* Handlers */
   const handleSelectInstitucion = async (id) => {
@@ -164,7 +219,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
   }
 
   function handleNextStep() {
-    if (validateStep1()) { setStep(2); setTimeout(() => productInputRef.current?.focus(), 100) }
+    if (validateStep1()) { setStep(2); setTimeout(() => quantityRef.current?.focus(), 100) }
     else toast.warning('Completá los datos de la institución')
   }
 
@@ -173,8 +228,9 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     const newErrors = {}
     if (!product.trim()) newErrors.product = 'El producto es obligatorio'
     if (!categoryId) newErrors.categoryId = 'La categoría es obligatoria'
-    if (!quantity || Number(quantity) <= 0) newErrors.quantity = 'La cantidad debe ser mayor a cero'
-    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); toast.warning('Completá los campos obligatorios'); return }
+    const qty = Number(quantity)
+    if (!quantity || quantity.trim() === '' || isNaN(qty) || qty <= 0) newErrors.quantity = 'Ingresá una cantidad positiva'
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); toast.warning('Corregí los campos marcados'); return }
 
     setErrors({})
     setSaving(true)
@@ -193,8 +249,9 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
         barcode: barcode.trim(),
         productName: normalizeText(product),
         description: normalizeText(description),
-        quantity: Number(quantity) || 1,
+        quantity: qty,
         categoryId,
+        presentation: presentation || 'unidades',
       }
 
       if (online && isConfigured()) {
@@ -214,7 +271,8 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
       addToQueue({
         institucionId, tipoMovimiento: isOperator ? 'Entrada' : tipoMovimiento,
         barcode: barcode.trim(), productName: normalizeText(product),
-        description: normalizeText(description), quantity: Number(quantity) || 1, categoryId,
+        description: normalizeText(description), quantity: qty, categoryId,
+        presentation: presentation || 'unidades',
       })
       resetForm()
     } finally {
@@ -224,7 +282,9 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
   }
 
   function resetForm() {
-    setBarcode(''); setProduct(''); setDescription(''); setCategoryId(''); setQuantity(1)
+    setBarcode(''); setBarcodeOptions([])
+    setProduct(''); setProductOptions([])
+    setDescription(''); setCategoryId(''); setPresentation(''); setQuantity('')
     setErrors({})
     if (isOperator) {
       setStep(2)
@@ -234,7 +294,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
       setEstadoId(''); setMunicipioId(''); setParroquiaId('')
       setMunicipios([]); setParroquias([])
     }
-    setTimeout(() => productInputRef.current?.focus(), 100)
+    setTimeout(() => quantityRef.current?.focus(), 100)
   }
 
   return (
@@ -376,14 +436,35 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
               <div className="space-y-2">
                 <Label htmlFor="barcode">Código de barras</Label>
                 <div className="flex gap-2">
-                  <Input id="barcode" inputMode="numeric" placeholder="Escanear o escribir" value={barcode} onChange={e => setBarcode(e.target.value)} readOnly={!!initialBarcode} />
+                  <SearchSelect
+                    id="barcode"
+                    options={barcodeOptions}
+                    value={barcode}
+                    onChange={handleBarcodeChange}
+                    onSearch={handleBarcodeSearch}
+                    searching={barcodeSearching}
+                    placeholder="Escanear o escribir..."
+                    emptyMessage={barcode?.trim().length >= 2 ? 'Sin resultados — podés escribir un código nuevo' : 'Escribí al menos 2 dígitos'}
+                    showValueAsText
+                    className="flex-1"
+                  />
                   {!initialBarcode && <Button type="button" variant="outline" size="icon" onClick={onScanAgain}><ScanLine className="w-4 h-4" /></Button>}
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="product">Producto <span className="text-destructive">*</span></Label>
-                <Input id="product" ref={productInputRef} placeholder="Ej: Agua Mineral, Arroz..." value={product} onChange={e => { setProduct(normalizeText(e.target.value)); if (errors.product) setErrors(p => ({...p, product: null})) }} />
+                <SearchSelect
+                  id="product"
+                  options={productOptions}
+                  value={product}
+                  onChange={handleProductChange}
+                  onSearch={handleProductSearch}
+                  searching={productSearching}
+                  placeholder="Escribí el nombre del producto..."
+                  emptyMessage={product?.trim().length >= 2 ? 'Sin resultados' : 'Escribí al menos 2 caracteres'}
+                  showValueAsText
+                />
                 {errors.product && <p className="text-xs text-destructive">{errors.product}</p>}
               </div>
 
@@ -394,7 +475,24 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
 
               <div className="space-y-2">
                 <Label htmlFor="quantity">Cantidad <span className="text-destructive">*</span></Label>
-                <Input id="quantity" type="number" min="1" value={quantity} onChange={e => { setQuantity(Number(e.target.value) || 1); if (errors.quantity) setErrors(p => ({...p, quantity: null})) }} />
+                <Input
+                  id="quantity"
+                  ref={quantityRef}
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputMode="numeric"
+                  placeholder="Ej: 10"
+                  value={quantity}
+                  onChange={e => { setQuantity(e.target.value); if (errors.quantity) setErrors(p => ({...p, quantity: null})) }}
+                  onBlur={() => {
+                    const q = Number(quantity)
+                    if (quantity && quantity.trim() !== '' && (isNaN(q) || q <= 0)) {
+                      setErrors(p => ({...p, quantity: 'Debe ser un número positivo'}))
+                    }
+                  }}
+                  className={errors.quantity ? 'border-destructive' : ''}
+                />
                 {errors.quantity && <p className="text-xs text-destructive">{errors.quantity}</p>}
               </div>
 

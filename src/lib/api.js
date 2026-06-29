@@ -189,6 +189,68 @@ export async function createCategoria(nombre) {
   return { value: data[0].id, label: data[0].nombre }
 }
 
+export async function searchBarcodes(query) {
+  if (!query || query.trim().length < 2) return []
+  const q = query.trim()
+  console.log(`[API] searchBarcodes — buscando "${q}"...`)
+  const { data, error } = await supabase
+    .from('producto_codigo')
+    .select('codigo, producto_id, producto (id, nombre, descripcion, presentacion, categoria_id)')
+    .ilike('codigo', `%${q}%`)
+    .limit(8)
+
+  if (error) {
+    console.error('[API] searchBarcodes ERROR:', error.message)
+    return []
+  }
+
+  console.log(`[API] searchBarcodes — ${data.length} resultado(s)`)
+  return data.map((item) => ({
+    value: item.codigo,
+    label: `${item.producto.nombre} [${item.codigo}]`,
+    detail: item.producto.descripcion || item.producto.presentacion || null,
+    productId: item.producto_id,
+    productName: item.producto.nombre,
+    description: item.producto.descripcion || '',
+    presentation: item.producto.presentacion || '',
+    categoryId: item.producto.categoria_id,
+  }))
+}
+
+export async function searchProducts(query) {
+  if (!query || query.trim().length < 2) return []
+  const q = query.trim()
+  console.log(`[API] searchProducts — buscando "${q}"...`)
+  const { data, error } = await supabase
+    .from('producto')
+    .select('id, nombre, descripcion, presentacion, categoria_id, categoria:categoria_id (nombre), producto_codigo (codigo)')
+    .ilike('nombre', `%${q}%`)
+    .limit(8)
+
+  if (error) {
+    console.error('[API] searchProducts ERROR:', error.message)
+    return []
+  }
+
+  console.log(`[API] searchProducts — ${data.length} resultado(s)`)
+  return data.map((item) => {
+    const cats = Array.isArray(item.categoria) ? item.categoria[0] : item.categoria
+    const codes = Array.isArray(item.producto_codigo) ? item.producto_codigo : []
+    const detail = [cats?.nombre, item.presentacion].filter(Boolean).join(' · ')
+    return {
+      value: String(item.id),
+      label: item.nombre,
+      detail: detail || null,
+      productId: item.id,
+      productName: item.nombre,
+      description: item.descripcion || '',
+      categoryId: item.categoria_id,
+      presentation: item.presentacion || '',
+      barcode: codes[0]?.codigo || '',
+    }
+  })
+}
+
 export async function findProductByBarcode(barcode) {
   if (!barcode) {
     console.log('[API] findProductByBarcode — skip: sin código')

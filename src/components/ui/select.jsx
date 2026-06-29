@@ -29,7 +29,7 @@ const SelectContent = React.forwardRef(({ className, children, position = 'poppe
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        'relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-md animate-in fade-in-80',
+        'relative z-[9999] max-h-96 min-w-[8rem] overflow-hidden rounded-lg border border-border bg-popover text-popover-foreground shadow-xl animate-in fade-in-80',
         position === 'popper' && 'translate-y-1',
         className
       )}
