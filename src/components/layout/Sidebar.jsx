@@ -48,7 +48,7 @@ export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpen
         <div className="flex items-center gap-2 h-14 px-4 border-b border-border shrink-0">
           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             {/* <Package className="w-5 h-5 text-primary" /> */}
-            <img src="./src/assets/logo_sicoac.png" alt="Logo SICOAC" />
+            <img src="/logo_sicoac.png" alt="Logo SICOAC" />
           </div>
           {!collapsed && <span className="font-bold text-sm truncate">Centros de Acopio</span>}
           <button

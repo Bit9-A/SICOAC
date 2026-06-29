@@ -57,7 +57,7 @@ export default function Home({ onStartScan, onStartManual, sessionCount }) {
         {/* Hero */}
         <div className="text-center space-y-3 pb-2">
           <div className="inline-flex items-center justify-center w-16 h-14 bg-primary/10 mb-2">
-            <img src="./src/assets/logo_sicoac.png" alt="Logo SICOAC" />
+            <img src="/logo_sicoac.png" alt="Logo SICOAC" />
           </div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
             Centros de Acopio
