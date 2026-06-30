@@ -460,7 +460,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
 
               <div className="space-y-2">
                 <Label htmlFor="description">Descripción</Label>
-                <Textarea id="description" rows={2} placeholder="Detalle adicional..." value={description} onChange={e => setDescription(normalizeText(e.target.value))} />
+                <Textarea id="description" rows={2} placeholder="Detalle adicional..." value={description} onChange={e => setDescription(e.target.value)} />
               </div>
 
               <div className="space-y-2">
