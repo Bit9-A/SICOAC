@@ -84,7 +84,7 @@ export default function VoluntariosPage() {
             <Label className="text-xs">Buscar</Label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre, cédula o email..." className="pl-9" />
+              <Input value={search} onChange={e => setSearch(e.target.value.toUpperCase())} placeholder="Nombre, cédula o email..." className="pl-9" />
             </div>
           </div>
           <div className="space-y-1">
