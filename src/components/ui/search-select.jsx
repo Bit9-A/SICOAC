@@ -16,6 +16,7 @@ export function SearchSelect({
   searching,      // bool — muestra spinner de búsqueda
   showValueAsText,// bool — si no hay option que matchee el value, muestra el value como texto
   error,          // bool — muestra borde rojo de error
+  inputMode,      // string — inputMode override (ej: 'numeric' para barcode)
 }) {
   const [open, setOpen]           = useState(false)
   const [query, setQuery]         = useState('')
@@ -185,7 +186,7 @@ export function SearchSelect({
           id={id}
           ref={inputRef}
           type="text"
-          inputMode={onSearch ? 'numeric' : undefined}
+          inputMode={inputMode}
           placeholder={triggerText}
           value={open ? query : ''}
           onChange={handleInputChange}

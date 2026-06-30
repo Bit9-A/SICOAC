@@ -508,21 +508,22 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
                 <h3 className="font-semibold">3. Producto</h3>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="barcode">Código de barras</Label>
-                <div className="flex gap-2">
-                  <SearchSelect
-                    id="barcode"
-                    options={barcodeOptions}
-                    value={barcode}
-                    onChange={handleBarcodeChange}
-                    onSearch={handleBarcodeSearch}
-                    searching={barcodeSearching}
-                    placeholder="Escanear o escribir..."
-                    emptyMessage={barcode?.trim().length >= 2 ? 'Sin resultados — puedes escribir un código nuevo' : 'Escribe al menos 2 dígitos'}
-                    showValueAsText
-                    className="flex-1"
-                  />
+                <div className="space-y-2">
+                  <Label htmlFor="barcode">Código de barras</Label>
+                  <div className="flex gap-2">
+                    <SearchSelect
+                      id="barcode"
+                      options={barcodeOptions}
+                      value={barcode}
+                      onChange={handleBarcodeChange}
+                      onSearch={handleBarcodeSearch}
+                      searching={barcodeSearching}
+                      placeholder="Escanear o escribir..."
+                      emptyMessage={barcode?.trim().length >= 2 ? 'Sin resultados — puedes escribir un código nuevo' : 'Escribe al menos 2 dígitos'}
+                      showValueAsText
+                      className="flex-1"
+                      inputMode="numeric"
+                    />
                   {!initialBarcode && <Button type="button" variant="outline" size="icon" onClick={onScanAgain}><ScanLine className="w-4 h-4" /></Button>}
                 </div>
               </div>
