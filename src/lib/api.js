@@ -457,6 +457,33 @@ export async function getDespachoConMovimientos(id) {
   return { ...desp, movimientos: movs || [] }
 }
 
+// ============================================================
+// VOLUNTARIOS
+// ============================================================
+
+export async function createVoluntario({ cedula, nombre, apellido, email, telefono, disponibilidadDias, disponibilidadHoraDesde, disponibilidadHoraHasta, institucionId }) {
+  const { data, error } = await supabase.from('voluntarios').insert({
+    cedula: cedula.trim(),
+    nombre: normalizeText(nombre),
+    apellido: normalizeText(apellido),
+    email: email.trim().toLowerCase(),
+    telefono: telefono?.trim() || null,
+    disponibilidad_dias: disponibilidadDias || null,
+    disponibilidad_hora_desde: disponibilidadHoraDesde || null,
+    disponibilidad_hora_hasta: disponibilidadHoraHasta || null,
+    institucion_id: institucionId || null,
+  }).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function getVoluntarios(institucionId) {
+  let q = supabase.from('voluntarios').select('*, institucion:institucion_id (nombre)').order('created_at', { ascending: false })
+  if (institucionId) q = q.eq('institucion_id', institucionId)
+  const { data } = await q
+  return data || []
+}
+
 export function isConfigured() {
   const configured = Boolean(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY)
   return configured
