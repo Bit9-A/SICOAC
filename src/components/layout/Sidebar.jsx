@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   LayoutDashboard, Package, ClipboardList, Users, Building2, Settings, LogOut,
-  ScanLine, ChevronLeft, Menu, ShoppingBag, Tags, QrCode, Truck, HeartHandshake, Contact, Car
+  ScanLine, ChevronLeft, Menu, ShoppingBag, Tags, QrCode, Truck, HeartHandshake, Contact, Car, ChevronUp
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -35,9 +35,19 @@ const NAV_ITEMS = {
   ],
 }
 
-export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpenScan }) {
+export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpenScan, user, profile }) {
   const [collapsed, setCollapsed] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const items = NAV_ITEMS[rol] || NAV_ITEMS.admin
+
+  const initials = profile ? (profile.nombre?.[0] || '') + (profile.apellido?.[0] || '') : '?'
+
+  function handleLogout() {
+    setShowConfirm(false)
+    setShowUserMenu(false)
+    onLogout()
+  }
 
   return (
     <>
@@ -101,16 +111,66 @@ export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpen
           })}
         </nav>
 
-        {/* Logout */}
-        <div className="p-2 border-t border-border">
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-muted-foreground hover:bg-secondary hover:text-destructive transition-colors"
-          >
-            <LogOut className="w-5 h-5 shrink-0" />
-            {!collapsed && <span>Cerrar sesión</span>}
-          </button>
-        </div>
+        {/* User area */}
+        {profile && (
+          <div className="border-t border-border">
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-secondary transition-colors"
+              title={collapsed ? `${profile.nombre} ${profile.apellido}` : undefined}
+            >
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <span className="text-sm font-semibold text-primary">{initials}</span>
+              </div>
+              {!collapsed && (
+                <>
+                  <div className="flex-1 text-left min-w-0">
+                    <p className="text-sm font-medium truncate">{profile.nombre} {profile.apellido}</p>
+                    <p className="text-xs text-muted-foreground truncate">{profile.institucion?.nombre || 'Sin institución'}</p>
+                  </div>
+                  <ChevronUp className={cn('w-4 h-4 text-muted-foreground transition-transform', showUserMenu && 'rotate-180')} />
+                </>
+              )}
+            </button>
+
+            {!collapsed && showUserMenu && (
+              <div className="px-4 pb-3 space-y-2">
+                <p className="text-xs text-muted-foreground capitalize">{profile.rol?.replace('_', ' ')}</p>
+                <button
+                  onClick={() => setShowConfirm(true)}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Confirm dialog */}
+        {showConfirm && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowConfirm(false)}>
+            <div className="bg-card rounded-xl p-6 max-w-sm mx-4 shadow-xl" onClick={e => e.stopPropagation()}>
+              <h3 className="font-semibold text-lg">¿Cerrar sesión?</h3>
+              <p className="text-sm text-muted-foreground mt-2">¿Estás seguro de que deseas cerrar la sesión?</p>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  className="flex-1 px-4 py-2 rounded-lg text-sm font-medium border border-input hover:bg-secondary transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </aside>
 
       {/* Mobile hamburger */}
