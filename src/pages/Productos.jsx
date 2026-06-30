@@ -27,7 +27,6 @@ export default function ProductosPage() {
   const [newCatId, setNewCatId] = useState('')
   const [newSubcatId, setNewSubcatId] = useState('')
   const [newBarcode, setNewBarcode] = useState('')
-
   const [newBarcodeInput, setNewBarcodeInput] = useState('')
 
   useEffect(() => { load() }, [])
@@ -163,8 +162,14 @@ export default function ProductosPage() {
             <div className="space-y-2">
               <Label>Código de barras</Label>
               <Input
-                value={newBarcode} onChange={e => setNewBarcode(e.target.value)}
-                inputMode="numeric" placeholder="Opcional"
+                value={newBarcode}
+                onChange={e => {
+                  const value = e.target.value.replace(/\D/g, '')
+                  setNewBarcode(value)
+                }}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="Opcional"
               />
             </div>
             <div className="md:col-span-3 flex gap-2">
@@ -237,11 +242,20 @@ export default function ProductosPage() {
                   <div className="flex gap-2">
                     <Input
                       value={newBarcodeInput}
-                      onChange={e => setNewBarcodeInput(e.target.value)}
+                      onChange={e => {
+                        const value = e.target.value.replace(/\D/g, '')
+                        setNewBarcodeInput(value)
+                      }}
                       inputMode="numeric"
+                      pattern="[0-9]*"
                       placeholder="Agregar código..."
                       className="h-8 text-xs"
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddBarcode(p.id) } }}
+                      onKeyDown={e => { 
+                        if (e.key === 'Enter') { 
+                          e.preventDefault(); 
+                          handleAddBarcode(p.id) 
+                        } 
+                      }}
                     />
                     <Button
                       type="button"
