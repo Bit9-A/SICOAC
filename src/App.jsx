@@ -16,6 +16,8 @@ import ProductosPage from '@/pages/Productos'
 import CategoriasPage from '@/pages/Categorias'
 import RegistrosPage from '@/pages/Registros'
 import DespachosPage from '@/pages/Despachos'
+import VoluntariosPage from '@/pages/Voluntarios'
+import VoluntarioRegistroPage from '@/pages/VoluntarioRegistro'
 import QrRegistroPage from '@/pages/QrRegistro'
 
 function AppContent() {
@@ -130,6 +132,9 @@ function AppContent() {
       {/* Usuarios — admin+ (super_admin ve todo, admin ve su inst) */}
       {page === 'usuarios' && isAdmin && <UsuariosPage />}
 
+      {/* Voluntarios — admin+ */}
+      {page === 'voluntarios' && isAdmin && <VoluntariosPage />}
+
       {/* Productos — admin+ */}
       {page === 'productos' && isAdmin && <ProductosPage />}
 
@@ -159,6 +164,11 @@ function AppContent() {
 }
 
 export default function App() {
+  // Ruta pública para registro de voluntarios (sin auth)
+  if (window.location.pathname === '/voluntario') {
+    return <VoluntarioRegistroPage />
+  }
+
   return (
     <AuthProvider>
       <AppContent />

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   LayoutDashboard, Package, ClipboardList, Users, Building2, Settings, LogOut,
-  ScanLine, ChevronLeft, Menu, ShoppingBag, Tags, QrCode, Truck,
+  ScanLine, ChevronLeft, Menu, ShoppingBag, Tags, QrCode, Truck, HeartHandshake,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -15,6 +15,7 @@ const NAV_ITEMS = {
     { id: 'usuarios',      label: 'Usuarios',      icon: Users },
     { id: 'instituciones', label: 'Instituciones',  icon: Building2 },
     { id: 'despachos',     label: 'Despachos',     icon: Truck },
+    { id: 'voluntarios',   label: 'Voluntarios',   icon: HeartHandshake },
     { id: 'qr',            label: 'QR Registro',    icon: QrCode },
   ],
   admin: [
@@ -25,6 +26,7 @@ const NAV_ITEMS = {
     { id: 'productos',     label: 'Productos',     icon: ShoppingBag },
     { id: 'categorias',    label: 'Categorías',    icon: Tags },
     { id: 'usuarios',      label: 'Usuarios',      icon: Users },
+    { id: 'voluntarios',   label: 'Voluntarios',   icon: HeartHandshake },
     { id: 'qr',            label: 'QR Registro',    icon: QrCode },
   ],
 }
