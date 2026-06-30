@@ -276,23 +276,49 @@ create policy "Allow public delete" on public.subcategoria for delete using (tru
 -- create policy "Allow public delete" on public.movimiento for delete using (true);
 
 -- 14. Seed Initial Geography, Categories and Movement Types
+-- Full geo seed in scripts/seed_geo.sql (24 estados, 335 municipios, 1138 parroquias)
+-- Run scripts/seed_geo.sql via Supabase SQL Editor to populate/replace geo data
 insert into public.estado (nombre) values 
-('Distrito Capital'),
-('Miranda'),
-('Zulia')
+('DISTRITO CAPITAL'),
+('MIRANDA'),
+('ZULIA')
 on conflict (nombre) do nothing;
 
 insert into public.municipio (nombre, estado_id) values
-('Libertador', (select id from public.estado where nombre = 'Distrito Capital')),
-('Chacao', (select id from public.estado where nombre = 'Miranda')),
-('Maracaibo', (select id from public.estado where nombre = 'Zulia'))
+('LIBERTADOR', (select id from public.estado where nombre = 'DISTRITO CAPITAL')),
+('CHACAO', (select id from public.estado where nombre = 'MIRANDA')),
+('MARACAIBO', (select id from public.estado where nombre = 'ZULIA'))
 on conflict (nombre, estado_id) do nothing;
 
 insert into public.parroquia (nombre, municipio_id) values
-('Catedral', (select id from public.municipio where nombre = 'Libertador' and estado_id = (select id from public.estado where nombre = 'Distrito Capital'))),
-('Chacao', (select id from public.municipio where nombre = 'Chacao' and estado_id = (select id from public.estado where nombre = 'Miranda'))),
-('Olegario Villalobos', (select id from public.municipio where nombre = 'Maracaibo' and estado_id = (select id from public.estado where nombre = 'Zulia')))
+('CATEDRAL', (select id from public.municipio where nombre = 'LIBERTADOR' and estado_id = (select id from public.estado where nombre = 'DISTRITO CAPITAL'))),
+('CHACAO', (select id from public.municipio where nombre = 'CHACAO' and estado_id = (select id from public.estado where nombre = 'MIRANDA'))),
+('OLEGARIO VILLALOBOS', (select id from public.municipio where nombre = 'MARACAIBO' and estado_id = (select id from public.estado where nombre = 'ZULIA')))
 on conflict (nombre, municipio_id) do nothing;
+
+-- Geo indexes
+create index if not exists idx_municipio_estado on public.municipio(estado_id, nombre);
+create index if not exists idx_parroquia_municipio on public.parroquia(municipio_id, nombre);
+
+-- Helper: full geo chain for institutions
+create or replace function public.get_institucion_geo(p_institucion_id bigint)
+returns table (
+  institucion_nombre text,
+  direccion text,
+  parroquia text,
+  municipio text,
+  estado text
+) language plpgsql stable as $$
+begin
+  return query
+    select i.nombre, i.direccion, p.nombre, m.nombre, e.nombre
+    from public.institucion i
+    join public.parroquia p on p.id = i.parroquia_id
+    join public.municipio m on m.id = p.municipio_id
+    join public.estado e on e.id = m.estado_id
+    where i.id = p_institucion_id;
+end;
+$$;
 
 insert into public.categoria (nombre) values
 ('Nutrición y alimentos'),
