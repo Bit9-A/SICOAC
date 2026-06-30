@@ -114,7 +114,19 @@ export default function UsuariosPage() {
       const { data: exist } = await supabase.from('usuarios').select('id').eq('username', normUsername).maybeSingle()
       if (exist) { setErrors({ username: 'El nombre de usuario ya existe' }); setLoading(false); return }
 
+      // Guardar sesión actual (admin) antes de crear usuario
+      const { data: { session: adminSession } } = await supabase.auth.getSession()
+
       await signUp({ username: normUsername, password, nombre: normNombre, apellido: normApellido, cedula: cedula.trim() || null, telefono: normTel, rol, institucionId: instId || null, disponibilidadDias: dispDias.join(','), disponibilidadHoraDesde: dispDesde || null, disponibilidadHoraHasta: dispHasta || null })
+
+      // Restaurar sesión del admin (signUp auto-inicia sesión como el nuevo usuario)
+      if (adminSession) {
+        await supabase.auth.setSession({
+          access_token: adminSession.access_token,
+          refresh_token: adminSession.refresh_token,
+        })
+      }
+
       toast.success('Usuario creado')
       setShowForm(false); setUsername(''); setPassword(''); setNombre(''); setApellido(''); setCedula(''); setTelefono(''); setRol('operador'); setInstId(''); setDispDias([]); setDispDesde(''); setDispHasta(''); setErrors({})
       loadUsuarios()

@@ -78,18 +78,63 @@ export async function getSession() {
 
 /**
  * Obtener perfil del usuario desde public.usuarios
+ * Si no existe, intenta crearlo desde los metadatos de auth
  */
 export async function getProfile(userId) {
   if (!userId) return null
+
+  // maybeSingle evita el 406 cuando no hay fila
   const { data, error } = await supabase
     .from('usuarios')
     .select('*, institucion:institucion_id (id, nombre, direccion)')
     .eq('id', userId)
-    .single()
+    .maybeSingle()
+
   if (error) {
+    console.error('Error al obtener perfil:', error)
     return null
   }
-  return data
+
+  // Si ya existe, devolverlo
+  if (data) return data
+
+  // No existe perfil — intentar crearlo desde la metadata de auth
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user?.user_metadata) return null
+
+    const meta = user.user_metadata
+    const { error: insertError } = await supabase
+      .from('usuarios')
+      .insert({
+        id: userId,
+        username: meta.username,
+        nombre: meta.nombre,
+        apellido: meta.apellido,
+        telefono: meta.telefono || null,
+        rol: meta.rol || 'operador',
+        institucion_id: meta.institucion_id ? Number(meta.institucion_id) : null,
+      })
+      .select('*, institucion:institucion_id (id, nombre, direccion)')
+      .single()
+
+    if (insertError) {
+      console.error('No se pudo crear perfil automático:', insertError)
+      return null
+    }
+
+    // Re-consultar el perfil recién creado
+    const { data: newProfile } = await supabase
+      .from('usuarios')
+      .select('*, institucion:institucion_id (id, nombre, direccion)')
+      .eq('id', userId)
+      .maybeSingle()
+
+    return newProfile
+  } catch (err) {
+    console.error('Error al recuperar perfil:', err)
+    return null
+  }
 }
 
 /**

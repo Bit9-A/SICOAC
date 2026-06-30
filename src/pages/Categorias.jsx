@@ -167,7 +167,7 @@ export default function CategoriasPage() {
           </Card>
         )}
 
-        <div className="rounded-lg border border-border overflow-hidden">
+        <div className="rounded-lg border border-border overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-secondary/50 text-sm">
@@ -201,8 +201,8 @@ export default function CategoriasPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="icon" className="w-7 h-7" onClick={() => { setEditId(c.id); setEditNombre(c.nombre) }}><Pencil className="w-3.5 h-3.5" /></Button>
-                        <Button variant="ghost" size="icon" className="w-7 h-7 text-destructive" onClick={() => handleDelete(c.id, c.nombre)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="w-11 h-11" onClick={() => { setEditId(c.id); setEditNombre(c.nombre) }}><Pencil className="w-3.5 h-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="w-11 h-11 text-destructive" onClick={() => handleDelete(c.id, c.nombre)}><Trash2 className="w-3.5 h-3.5" /></Button>
                       </td>
                     </>
                   )}
@@ -271,7 +271,7 @@ export default function CategoriasPage() {
           </Card>
         )}
 
-        <div className="rounded-lg border border-border overflow-hidden">
+        <div className="rounded-lg border border-border overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-secondary/50 text-sm">
@@ -323,8 +323,8 @@ export default function CategoriasPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="icon" className="w-7 h-7 shrink-0" onClick={() => { setEditSubId(sc.id); setEditSubNombre(sc.nombre); setEditSubCategoriaId(String(sc.categoria_id)) }}><Pencil className="w-3.5 h-3.5" /></Button>
-                        <Button variant="ghost" size="icon" className="w-7 h-7 text-destructive shrink-0" onClick={() => handleDeleteSub(sc.id, sc.nombre)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="w-11 h-11 shrink-0" onClick={() => { setEditSubId(sc.id); setEditSubNombre(sc.nombre); setEditSubCategoriaId(String(sc.categoria_id)) }}><Pencil className="w-3.5 h-3.5" /></Button>
+                        <Button variant="ghost" size="icon" className="w-11 h-11 text-destructive shrink-0" onClick={() => handleDeleteSub(sc.id, sc.nombre)}><Trash2 className="w-3.5 h-3.5" /></Button>
                       </td>
                     </>
                   )}

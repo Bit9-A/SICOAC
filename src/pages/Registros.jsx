@@ -155,7 +155,7 @@ export default function RegistrosPage() {
                 </div>
                 <TipoBadge tipo={m.tipo?.nombre} />
                 <EstadoBadge m={m} />
-                <div className="text-xs text-muted-foreground hidden lg:block max-w-[240px] truncate">
+                <div className="text-xs text-muted-foreground hidden md:block max-w-[240px] truncate">
                   {m.tipo?.nombre === 'Transferencia' ? (
                     <span>{m.institucion_origen?.nombre || '?'} → {m.institucion_destino?.nombre || '?'}</span>
                   ) : (
