@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ShoppingBag, Search, Plus, Pencil, Trash2, X, Check, Barcode, ScanLine } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { SearchSelect } from '@/components/ui/search-select'
 import { supabase } from '@/lib/supabase'
-import { getCategorias, createCategoria, getSubcategorias } from '@/lib/api'
+import { getCategorias, createCategoria, getSubcategorias, searchProducts } from '@/lib/api'
 import { normalizeText } from '@/lib/utils'
 import { toast } from 'sonner'
 import Scanner from '@/pages/Scanner'
@@ -31,6 +31,8 @@ export default function ProductosPage() {
   const [newBarcodeInput, setNewBarcodeInput] = useState('')
   const [showScanner, setShowScanner] = useState(false)
   const [scanTarget, setScanTarget] = useState(null) // 'new' | barcode line id for edit
+  const [newProductOptions, setNewProductOptions] = useState([])
+  const [newProductSearching, setNewProductSearching] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -54,6 +56,27 @@ export default function ProductosPage() {
 
   const subcategoriasPorCat = (catId) =>
     catId ? subcategorias.filter(s => String(s.categoriaId) === String(catId)) : []
+
+  const handleNewProductSearch = useCallback(async (query) => {
+    if (!query || query.trim().length < 2) { setNewProductOptions([]); return }
+    setNewProductSearching(true)
+    try {
+      const results = await searchProducts(query)
+      setNewProductOptions(results)
+    } finally { setNewProductSearching(false) }
+  }, [])
+
+  const handleNewProductSelect = useCallback((val) => {
+    const found = newProductOptions.find(o => o.value === val)
+    if (found) {
+      setNewNombre(found.productName)
+      setNewDesc(found.description || '')
+      setNewCatId(found.categoryId)
+      setNewSubcatId(found.subcategoriaId || '')
+      setNewBarcode(found.barcode || '')
+      toast.info(`Producto seleccionado: ${found.productName}`)
+    }
+  }, [newProductOptions])
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -152,7 +175,20 @@ export default function ProductosPage() {
         <Card className="p-5 space-y-4">
           <h3 className="font-semibold">Nuevo Producto</h3>
           <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2"><Label>Nombre *</Label><Input value={newNombre} onChange={e => setNewNombre(e.target.value.toUpperCase())} /></div>
+            <div className="space-y-2">
+              <Label>Nombre *</Label>
+              <SearchSelect
+                options={newProductOptions}
+                value={newNombre}
+                onChange={handleNewProductSelect}
+                onSearch={handleNewProductSearch}
+                onQueryChange={v => setNewNombre(v.toUpperCase())}
+                searching={newProductSearching}
+                placeholder="Escribe o busca un producto..."
+                emptyMessage={newNombre?.trim().length >= 2 ? 'Sin resultados — puedes escribir un nombre nuevo' : 'Escribe al menos 2 caracteres'}
+                showValueAsText
+              />
+            </div>
             <div className="space-y-2"><Label>Descripción</Label><Input value={newDesc} onChange={e => setNewDesc(e.target.value.toUpperCase())} /></div>
             <div className="space-y-2">
               <Label>Categoría *</Label>
