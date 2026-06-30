@@ -6,7 +6,26 @@
 -- crea el trigger de perfil automático, y crea el superadmin.
 -- ============================================================
 
--- 1. Arreglar tabla usuarios: agregar columnas faltantes si no existen
+-- 1. PRIMERO: eliminar cualquier FK sobre la columna rol
+-- (hay que hacerlo antes de alterar el tipo, o PostgreSQL falla)
+do $$ declare
+  r record;
+begin
+  for r in (
+    select con.conname
+    from pg_constraint con
+    join pg_class cls on cls.oid = con.conrelid
+    join pg_attribute att on att.attrelid = con.conrelid
+      and att.attnum = any(con.conkey)
+    where cls.relname = 'usuarios'
+      and att.attname = 'rol'
+      and con.contype = 'f'
+  ) loop
+    execute format('alter table public.usuarios drop constraint if exists %I', r.conname);
+  end loop;
+end $$;
+
+-- 2. Agregar columnas faltantes si no existen
 do $$ begin
   if not exists (select 1 from information_schema.columns
     where table_schema = 'public' and table_name = 'usuarios' and column_name = 'rol')
@@ -21,28 +40,14 @@ do $$ begin
   end if;
 end $$;
 
--- 2. Asegurar tipo de columna rol
+-- 3. Asegurar tipo de columna rol (ahora sin FK, esto funciona)
 alter table public.usuarios alter column rol type text using rol::text;
 alter table public.usuarios alter column rol set default 'operador';
 
--- 3. Limpiar constraints viejos y asegurar check constraint
-do $$ declare
-  r record;
-begin
-  -- Eliminar cualquier FK sobre la columna 'rol' de usuarios
-  for r in (
-    select con.conname
-    from pg_constraint con
-    join pg_class cls on cls.oid = con.conrelid
-    join pg_attribute att on att.attrelid = con.conrelid
-      and att.attnum = any(con.conkey)
-    where cls.relname = 'usuarios'
-      and att.attname = 'rol'
-      and con.contype = 'f'
-  ) loop
-    execute format('alter table public.usuarios drop constraint if exists %I', r.conname);
-  end loop;
-end $$;
+-- 4. Check constraint
+alter table public.usuarios drop constraint if exists usuarios_rol_check;
+alter table public.usuarios add constraint usuarios_rol_check
+  check (rol in ('super_admin', 'admin', 'operador'));
 
 alter table public.usuarios drop constraint if exists usuarios_rol_check;
 alter table public.usuarios add constraint usuarios_rol_check
