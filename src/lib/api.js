@@ -484,7 +484,7 @@ export async function getDespachoConMovimientos(id) {
 // VOLUNTARIOS
 // ============================================================
 
-export async function createVoluntario({ cedula, nombre, apellido, email, telefono, disponibilidadDias, disponibilidadHoraDesde, disponibilidadHoraHasta, institucionId }) {
+export async function createVoluntario({ cedula, nombre, apellido, email, telefono, disponibilidadDias, disponibilidadHoraDesde, disponibilidadHoraHasta, institucionId, fechaNacimiento, genero }) {
   const { data, error } = await supabase.from('voluntarios').insert({
     cedula: cedula.trim(),
     nombre: normalizeText(nombre),
@@ -495,6 +495,8 @@ export async function createVoluntario({ cedula, nombre, apellido, email, telefo
     disponibilidad_hora_desde: disponibilidadHoraDesde || null,
     disponibilidad_hora_hasta: disponibilidadHoraHasta || null,
     institucion_id: institucionId || null,
+    fecha_nacimiento: fechaNacimiento || null,
+    genero: genero || null,
   }).select().single()
   if (error) throw error
   return data

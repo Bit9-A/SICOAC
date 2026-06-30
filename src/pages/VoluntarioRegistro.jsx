@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Clock, CheckCircle, Building2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,11 +39,14 @@ export default function VoluntarioRegistroPage() {
   const rawInst = params.get('inst')
   const instId = rawInst && rawInst !== 'null' ? rawInst : null
 
+  const [nacionalidad, setNacionalidad] = useState('V')
   const [cedula, setCedula] = useState('')
   const [nombre, setNombre] = useState('')
   const [apellido, setApellido] = useState('')
   const [email, setEmail] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [fechaNacimiento, setFechaNacimiento] = useState('')
+  const [genero, setGenero] = useState('')
   const [dispDias, setDispDias] = useState([])
   const [dispDesde, setDispDesde] = useState('')
   const [dispHasta, setDispHasta] = useState('')
@@ -71,15 +74,22 @@ export default function VoluntarioRegistroPage() {
     setTelefono(formatted)
   }
 
+  function soloLetras(value) {
+    return value.replace(/[^A-ZÁÉÍÓÚÑ\s]/g, '')
+  }
+
   function validate() {
     const e = {}
     if (!cedula.trim()) e.cedula = 'La cédula es obligatoria'
-    else if (!/^[VEJPG]?[-]?\d{6,10}$/i.test(cedula.trim())) e.cedula = 'Formato inválido (Ej: V-12345678)'
+    else if (!/^\d{6,10}$/.test(cedula.trim())) e.cedula = 'Número de cédula inválido'
     if (!nombre.trim()) e.nombre = 'El nombre es obligatorio'
+    else if (!/^[A-ZÁÉÍÓÚÑ\s]+$/.test(nombre.toUpperCase().trim())) e.nombre = 'Solo se permiten letras y espacios'
     if (!apellido.trim()) e.apellido = 'El apellido es obligatorio'
+    else if (!/^[A-ZÁÉÍÓÚÑ\s]+$/.test(apellido.toUpperCase().trim())) e.apellido = 'Solo se permiten letras y espacios'
     if (!email.trim()) e.email = 'El correo es obligatorio'
     else if (!/^\S+@\S+\.\S+$/.test(email.trim())) e.email = 'Correo inválido'
     if (telefono && !/^\d{3}-\d{7}$/.test(telefono)) e.telefono = 'Formato inválido (Ej: 412-7445102)'
+    if (!genero) e.genero = 'Selecciona un género'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -91,11 +101,13 @@ export default function VoluntarioRegistroPage() {
     setLoading(true)
     try {
       await createVoluntario({
-        cedula: cedula.trim(),
-        nombre,
-        apellido,
+        cedula: `${nacionalidad}${cedula.trim()}`,
+        nombre: soloLetras(nombre.toUpperCase()),
+        apellido: soloLetras(apellido.toUpperCase()),
         email: email.trim().toLowerCase(),
         telefono,
+        fechaNacimiento: fechaNacimiento || null,
+        genero: genero || null,
         disponibilidadDias: dispDias.join(','),
         disponibilidadHoraDesde: dispDesde || null,
         disponibilidadHoraHasta: dispHasta || null,
@@ -147,10 +159,19 @@ export default function VoluntarioRegistroPage() {
             </div>
           )}
 
-          {/* Cédula */}
+          {/* Nacionalidad + Cédula */}
           <div className="space-y-2">
             <Label>Cédula de identidad *</Label>
-            <Input value={cedula} onChange={e => setCedula(e.target.value.toUpperCase())} placeholder="V-12345678" className={errors.cedula ? 'border-destructive' : ''} />
+            <div className="flex gap-2">
+              <select value={nacionalidad} onChange={e => setNacionalidad(e.target.value)}
+                className="w-16 h-9 rounded-lg border border-input bg-secondary px-2 text-sm shrink-0">
+                <option value="V">V</option>
+                <option value="E">E</option>
+              </select>
+              <div className="flex-1">
+                <Input value={cedula} onChange={e => setCedula(e.target.value.replace(/\D/g, ''))} placeholder="30609563" className={errors.cedula ? 'border-destructive' : ''} />
+              </div>
+            </div>
             {errors.cedula && <p className="text-xs text-destructive">{errors.cedula}</p>}
           </div>
 
@@ -158,13 +179,32 @@ export default function VoluntarioRegistroPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Nombre *</Label>
-              <Input value={nombre} onChange={e => setNombre(e.target.value.toUpperCase())} placeholder="MARIA" className={errors.nombre ? 'border-destructive' : ''} />
+              <Input value={nombre} onChange={e => setNombre(soloLetras(e.target.value.toUpperCase()))} placeholder="MARIA" className={errors.nombre ? 'border-destructive' : ''} />
               {errors.nombre && <p className="text-xs text-destructive">{errors.nombre}</p>}
             </div>
             <div className="space-y-2">
               <Label>Apellido *</Label>
-              <Input value={apellido} onChange={e => setApellido(e.target.value.toUpperCase())} placeholder="PEREZ" className={errors.apellido ? 'border-destructive' : ''} />
+              <Input value={apellido} onChange={e => setApellido(soloLetras(e.target.value.toUpperCase()))} placeholder="PEREZ" className={errors.apellido ? 'border-destructive' : ''} />
               {errors.apellido && <p className="text-xs text-destructive">{errors.apellido}</p>}
+            </div>
+          </div>
+
+          {/* Fecha de nacimiento + Género */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Fecha de nacimiento *</Label>
+              <Input type="date" value={fechaNacimiento} onChange={e => setFechaNacimiento(e.target.value)} className={errors.fechaNacimiento ? 'border-destructive' : ''} />
+              {errors.fechaNacimiento && <p className="text-xs text-destructive">{errors.fechaNacimiento}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label>Género *</Label>
+              <select value={genero} onChange={e => setGenero(e.target.value)}
+                className={`flex h-9 w-full rounded-lg border border-input bg-secondary px-3 text-sm ${errors.genero ? 'border-destructive' : ''}`}>
+                <option value="">Seleccionar</option>
+                <option value="M">MASCULINO</option>
+                <option value="F">FEMENINO</option>
+              </select>
+              {errors.genero && <p className="text-xs text-destructive">{errors.genero}</p>}
             </div>
           </div>
 
