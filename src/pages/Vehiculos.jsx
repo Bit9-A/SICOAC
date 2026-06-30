@@ -144,23 +144,23 @@ export default function VehiculosPage() {
           <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="space-y-2">
               <Label>Placa *</Label>
-              <Input placeholder="Ej: ABC12D" value={newPlaca} onChange={e => setNewPlaca(e.target.value)} />
+              <Input placeholder="Ej: ABC12D" value={newPlaca} onChange={e => setNewPlaca(e.target.value.toUpperCase())} />
             </div>
             <div className="space-y-2">
               <Label>Marca</Label>
-              <Input placeholder="Ej: Ford" value={newMarca} onChange={e => setNewMarca(e.target.value)} />
+              <Input placeholder="Ej: Ford" value={newMarca} onChange={e => setNewMarca(e.target.value.toUpperCase())} />
             </div>
             <div className="space-y-2">
               <Label>Modelo *</Label>
-              <Input placeholder="Ej: Triton" value={newModelo} onChange={e => setNewModelo(e.target.value)} />
+              <Input placeholder="Ej: Triton" value={newModelo} onChange={e => setNewModelo(e.target.value.toUpperCase())} />
             </div>
             <div className="space-y-2">
               <Label>Color</Label>
-              <Input placeholder="Ej: Blanco" value={newColor} onChange={e => setNewColor(e.target.value)} />
+              <Input placeholder="Ej: Blanco" value={newColor} onChange={e => setNewColor(e.target.value.toUpperCase())} />
             </div>
             <div className="space-y-2">
               <Label>Capacidad</Label>
-              <Input placeholder="Ej: 3.5 TON" value={newCapacidad} onChange={e => setNewCapacidad(e.target.value)} />
+              <Input placeholder="Ej: 3.5 TONELADAS" value={newCapacidad} onChange={e => setNewCapacidad(e.target.value.toUpperCase())} />
             </div>
             <div className="md:col-span-5 flex gap-2">
               <Button type="submit">Registrar Vehículo</Button>
