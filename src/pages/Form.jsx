@@ -201,7 +201,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     return { value: 'new', label: name }
   }
 
-  const handleCreateCategory = async (name) => ({ value: name, label: name })
+  const handleCreateCategory = async (name) => ({ value: name.toUpperCase(), label: name.toUpperCase() })
 
   function validateStep1() {
     const e = {}
@@ -536,7 +536,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
                   value={product}
                   onChange={handleProductChange}
                   onSearch={handleProductSearch}
-                  onQueryChange={setProduct}
+                  onQueryChange={v => setProduct(v.toUpperCase())}
                   searching={productSearching}
                   placeholder="Escribe el nombre del producto..."
                   emptyMessage={product?.trim().length >= 2 ? 'Sin resultados — puede escribir un nombre nuevo' : 'Escribe al menos 2 caracteres'}
