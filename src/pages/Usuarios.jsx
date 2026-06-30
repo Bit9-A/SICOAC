@@ -93,14 +93,14 @@ export default function UsuariosPage() {
     const newErrors = {}
     const normNombre = normalizeText(nombre)
     const normApellido = normalizeText(apellido)
-    const normUsername = username.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    const normUsername = username.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     const normTel = telefono.trim()
 
     if (!normNombre) newErrors.nombre = 'El nombre es obligatorio'
     if (!normApellido) newErrors.apellido = 'El apellido es obligatorio'
     if (!normUsername) newErrors.username = 'El usuario es obligatorio'
     else if (normUsername.length < 3) newErrors.username = 'Mínimo 3 caracteres'
-    else if (!/^[a-z0-9._]+$/.test(normUsername)) newErrors.username = 'Solo letras, números, puntos y guion bajo'
+    else if (!/^[a-zA-Z0-9._]+$/.test(normUsername)) newErrors.username = 'Solo letras, números, puntos y guion bajo'
     if (!password) newErrors.password = 'La contraseña es obligatoria'
     else if (password.length < 6) newErrors.password = 'Mínimo 6 caracteres'
     if (!instId) newErrors.instId = 'La institución es obligatoria'

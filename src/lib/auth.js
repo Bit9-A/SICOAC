@@ -19,7 +19,7 @@ export async function signUp({ username, password, nombre, apellido, telefono, c
     password,
     options: {
       data: {
-        username: username.toLowerCase().trim(),
+        username: username.toUpperCase().trim(),
         nombre,
         apellido,
         cedula: cedula || null,

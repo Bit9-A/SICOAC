@@ -131,7 +131,7 @@ export default function Login({ onLogin, defaultInstitucionId }) {
     try {
       const { signUp } = await import('@/lib/auth')
       const instId = effectiveInstId || null
-      const normUsername = username.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      const normUsername = username.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
       // Verificar username único
       const { data: exist } = await supabase.from('usuarios').select('id').eq('username', normUsername).maybeSingle()
