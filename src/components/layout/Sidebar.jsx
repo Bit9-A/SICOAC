@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   LayoutDashboard, Package, ClipboardList, Users, Building2, Settings, LogOut,
-  ScanLine, ChevronLeft, Menu, ShoppingBag, Tags, QrCode, Truck, HeartHandshake,
+  ScanLine, ChevronLeft, Menu, ShoppingBag, Tags, QrCode, Truck, HeartHandshake, Contact, Car
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -14,6 +14,8 @@ const NAV_ITEMS = {
     { id: 'categorias',    label: 'Categorías',    icon: Tags },
     { id: 'usuarios',      label: 'Usuarios',      icon: Users },
     { id: 'instituciones', label: 'Instituciones',  icon: Building2 },
+    { id: 'choferes',      label: 'Choferes',      icon: Contact },
+    { id: 'vehiculos',     label: 'Vehículos',     icon: Car },
     { id: 'despachos',     label: 'Despachos',     icon: Truck },
     { id: 'voluntarios',   label: 'Voluntarios',   icon: HeartHandshake },
     { id: 'qr',            label: 'QR Registro',    icon: QrCode },
@@ -22,6 +24,8 @@ const NAV_ITEMS = {
     { id: 'dashboard',     label: 'Dashboard',     icon: LayoutDashboard },
     { id: 'inventario',    label: 'Inventario',    icon: Package },
     { id: 'registros',     label: 'Registros',     icon: ClipboardList },
+    { id: 'choferes',      label: 'Choferes',      icon: Contact },
+    { id: 'vehiculos',     label: 'Vehículos',     icon: Car },
     { id: 'despachos',     label: 'Despachos',     icon: Truck },
     { id: 'productos',     label: 'Productos',     icon: ShoppingBag },
     { id: 'categorias',    label: 'Categorías',    icon: Tags },

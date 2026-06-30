@@ -11,6 +11,8 @@ import Login from '@/pages/Login'
 import DashboardPage from '@/pages/Dashboard'
 import InventarioPage from '@/pages/Inventario'
 import UsuariosPage from '@/pages/Usuarios'
+import ChoferesPage from '@/pages/Choferes'
+import VehiculosPage from '@/pages/Vehiculos'
 import InstitucionesPage from '@/pages/Instituciones'
 import ProductosPage from '@/pages/Productos'
 import CategoriasPage from '@/pages/Categorias'
@@ -149,6 +151,10 @@ function AppContent() {
 
       {/* QR Registro — admin+ */}
       {page === 'qr' && isAdmin && <QrRegistroPage />}
+
+      {page === 'choferes' && isAdmin && <ChoferesPage />}
+      
+      {page === 'vehiculos' && isAdmin && <VehiculosPage />}
 
       {/* Instituciones — solo super_admin */}
       {page === 'instituciones' && rol === 'super_admin' && <InstitucionesPage />}

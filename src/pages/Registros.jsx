@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ClipboardList, Search, ArrowDownCircle, ArrowUpCircle, ArrowLeftRight, Filter, CheckCircle, Clock } from 'lucide-react'
+import { ClipboardList, Search, ArrowDownCircle, ArrowUpCircle, ArrowLeftRight, Filter, CheckCircle, Clock, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -7,9 +7,8 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
-import { getInstituciones, recibirTransferencia } from '@/lib/api'
+import { getInstituciones } from '@/lib/api'
 import { normalizeText } from '@/lib/utils'
-import { toast } from 'sonner'
 
 export default function RegistrosPage() {
   const { institucionId, isSuperAdmin } = useAuth()
@@ -49,28 +48,14 @@ export default function RegistrosPage() {
     return true
   })
 
-  // ¿El usuario puede recibir esta transferencia? (si es admin de la institución destino)
-  function canReceive(m) {
-    if (m.tipo?.nombre !== 'Transferencia') return false
-    if (m.estado === 'recibido' || m.estado === 'completado') return false
-    if (isSuperAdmin) return true
-    return String(m.institucion_destino_id) === String(institucionId)
-  }
-
-  async function handleReceive(m) {
-    try {
-      await recibirTransferencia(m.id)
-      toast.success(`Transferencia de ${m.producto?.nombre} recibida`)
-      loadMovimientos()
-    } catch (err) {
-      toast.error(err.message)
-    }
-  }
-
   function EstadoBadge({ m }) {
     if (m.tipo?.nombre !== 'Transferencia') return null
+    
     if (m.estado === 'recibido' || m.estado === 'completado') {
       return <Badge variant="success" className="gap-1"><CheckCircle className="w-3 h-3" /> Recibido</Badge>
+    }
+    if (m.estado === 'cancelado') {
+      return <Badge variant="destructive" className="gap-1"><XCircle className="w-3 h-3" /> Cancelado</Badge>
     }
     return <Badge variant="warning" className="gap-1"><Clock className="w-3 h-3" /> Enviado</Badge>
   }
@@ -85,7 +70,7 @@ export default function RegistrosPage() {
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Registros</h1>
-        <p className="text-sm text-muted-foreground mt-1">Movimientos de productos</p>
+        <p className="text-sm text-muted-foreground mt-1">Movimientos e historial de auditoría de productos</p>
       </div>
 
       {/* Filters */}
@@ -112,22 +97,37 @@ export default function RegistrosPage() {
         </Button>
       </div>
 
-      {/* Pending transfers banner */}
+      {/* Resumen de estados en Transferencias */}
       {!filterTipo && (
         <div className="flex flex-wrap gap-2">
-          {['Enviado', 'Recibido'].filter(s =>
-            movimientos.some(m => m.tipo?.nombre === 'Transferencia' && m.estado === (s === 'Enviado' ? 'enviado' : 'recibido'))
-          ).map(s => (
-            <Badge key={s} variant={s === 'Enviado' ? 'warning' : 'success'} className="gap-1 cursor-pointer" onClick={() => {}}>
-              {s === 'Enviado' ? <Clock className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
-              {s} ({movimientos.filter(m => m.tipo?.nombre === 'Transferencia' && m.estado === (s === 'Enviado' ? 'enviado' : 'recibido')).length})
-            </Badge>
-          ))}
+          {['Enviado', 'Recibido', 'Cancelado'].filter(s => {
+            const dbStatus = s === 'Enviado' ? 'enviado' : s === 'Recibido' ? 'recibido' : 'cancelado';
+            return movimientos.some(m => m.tipo?.nombre === 'Transferencia' && (m.estado === dbStatus || (dbStatus === 'recibido' && m.estado === 'completado')))
+          }).map(s => {
+            const dbStatus = s === 'Enviado' ? 'enviado' : s === 'Recibido' ? 'recibido' : 'cancelado';
+            const count = movimientos.filter(m => 
+              m.tipo?.nombre === 'Transferencia' && 
+              (m.estado === dbStatus || (dbStatus === 'recibido' && m.estado === 'completado'))
+            ).length;
+
+            return (
+              <Badge 
+                key={s} 
+                variant={s === 'Enviado' ? 'warning' : s === 'Recibido' ? 'success' : 'destructive'} 
+                className="gap-1"
+              >
+                {s === 'Enviado' && <Clock className="w-3 h-3" />}
+                {s === 'Recibido' && <CheckCircle className="w-3 h-3" />}
+                {s === 'Cancelado' && <XCircle className="w-3 h-3" />}
+                {s} ({count})
+              </Badge>
+            )
+          })}
         </div>
       )}
 
       {loading ? (
-        <p className="text-center text-muted-foreground py-8">Cargando...</p>
+        <p className="text-center text-muted-foreground py-8">Cargando movimientos...</p>
       ) : (
         <div className="space-y-2">
           {filtered.map(m => (
@@ -137,7 +137,9 @@ export default function RegistrosPage() {
                   <ClipboardList className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{m.producto?.nombre || 'Producto'}</p>
+                  <p className={`font-medium truncate ${m.estado === 'cancelado' ? 'line-through text-muted-foreground decoration-red-400' : ''}`}>
+                    {m.producto?.nombre || 'Producto'}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(m.created_at).toLocaleDateString('es-VE', {
                       year: 'numeric', month: 'short', day: 'numeric',
@@ -146,25 +148,20 @@ export default function RegistrosPage() {
                   </p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-lg font-bold tabular-nums">{Number(m.cantidad).toFixed(0)}</p>
+                  <p className={`text-lg font-bold tabular-nums ${m.estado === 'cancelado' ? 'text-muted-foreground line-through decoration-red-400' : ''}`}>
+                    {Number(m.cantidad).toFixed(0)}
+                  </p>
                   <p className="text-xs text-muted-foreground">{m.unidad || 'unidades'}</p>
                 </div>
                 <TipoBadge tipo={m.tipo?.nombre} />
                 <EstadoBadge m={m} />
-                <div className="text-xs text-muted-foreground hidden lg:block max-w-[180px] truncate">
+                <div className="text-xs text-muted-foreground hidden lg:block max-w-[240px] truncate">
                   {m.tipo?.nombre === 'Transferencia' ? (
                     <span>{m.institucion_origen?.nombre || '?'} → {m.institucion_destino?.nombre || '?'}</span>
                   ) : (
                     m.institucion_origen?.nombre || m.institucion_destino?.nombre || '—'
                   )}
                 </div>
-
-                {/* Receive button */}
-                {canReceive(m) && (
-                  <Button size="sm" variant="default" className="shrink-0 gap-1" onClick={() => handleReceive(m)}>
-                    <CheckCircle className="w-4 h-4" /> Recibir
-                  </Button>
-                )}
               </div>
             </Card>
           ))}
