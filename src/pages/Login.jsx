@@ -24,6 +24,7 @@ export default function Login({ onLogin, defaultInstitucionId }) {
   const [nombre, setNombre] = useState('')
   const [apellido, setApellido] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [cedula, setCedula] = useState('')
   const [dispDias, setDispDias] = useState([])
   const [dispDesde, setDispDesde] = useState('')
   const [dispHasta, setDispHasta] = useState('')
@@ -128,14 +129,20 @@ export default function Login({ onLogin, defaultInstitucionId }) {
 
     setLoading(true)
     try {
-      // Dynamic import para no cargar signUp siempre
       const { signUp } = await import('@/lib/auth')
       const instId = effectiveInstId || null
+      const normUsername = username.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+      // Verificar username único
+      const { data: exist } = await supabase.from('usuarios').select('id').eq('username', normUsername).maybeSingle()
+      if (exist) { setError('El nombre de usuario ya está registrado'); setLoading(false); return }
+
       await signUp({
-        username: username.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
+        username: normUsername,
         password,
         nombre: normalizeText(nombre),
         apellido: normalizeText(apellido),
+        cedula: cedula.trim() || null,
         telefono: telefono.trim(),
         rol: 'operador',
         institucionId: instId,
@@ -249,6 +256,10 @@ export default function Login({ onLogin, defaultInstitucionId }) {
                   <p className="text-xs text-muted-foreground">Se registrará como Operador</p>
                 </div>
               )}
+              <div className="space-y-2">
+                <Label htmlFor="reg-cedula">Cédula</Label>
+                <Input id="reg-cedula" value={cedula} onChange={e => setCedula(e.target.value.toUpperCase())} placeholder="V-12345678" />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="reg-nombre">Nombre <span className="text-destructive">*</span></Label>

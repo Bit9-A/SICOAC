@@ -39,6 +39,7 @@ export default function UsuariosPage() {
   const [nombre, setNombre] = useState('')
   const [apellido, setApellido] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [cedula, setCedula] = useState('')
   const [rol, setRol] = useState('operador')
   const [instId, setInstId] = useState('')
   const [dispDias, setDispDias] = useState([])
@@ -109,9 +110,13 @@ export default function UsuariosPage() {
 
     setLoading(true)
     try {
-      await signUp({ username: normUsername, password, nombre: normNombre, apellido: normApellido, telefono: normTel, rol, institucionId: instId || null, disponibilidadDias: dispDias.join(','), disponibilidadHoraDesde: dispDesde || null, disponibilidadHoraHasta: dispHasta || null })
+      // Verificar username único
+      const { data: exist } = await supabase.from('usuarios').select('id').eq('username', normUsername).maybeSingle()
+      if (exist) { setErrors({ username: 'El nombre de usuario ya existe' }); setLoading(false); return }
+
+      await signUp({ username: normUsername, password, nombre: normNombre, apellido: normApellido, cedula: cedula.trim() || null, telefono: normTel, rol, institucionId: instId || null, disponibilidadDias: dispDias.join(','), disponibilidadHoraDesde: dispDesde || null, disponibilidadHoraHasta: dispHasta || null })
       toast.success('Usuario creado')
-      setShowForm(false); setUsername(''); setPassword(''); setNombre(''); setApellido(''); setTelefono(''); setRol('operador'); setInstId(''); setDispDias([]); setDispDesde(''); setDispHasta(''); setErrors({})
+      setShowForm(false); setUsername(''); setPassword(''); setNombre(''); setApellido(''); setCedula(''); setTelefono(''); setRol('operador'); setInstId(''); setDispDias([]); setDispDesde(''); setDispHasta(''); setErrors({})
       loadUsuarios()
     } catch (err) { toast.error(err.message) } finally { setLoading(false) }
   }
@@ -165,6 +170,10 @@ export default function UsuariosPage() {
                 <Label>Contraseña *</Label>
                 <Input type="password" value={password} onChange={e => setPassword(e.target.value)} className={errors.password ? 'border-destructive' : ''} placeholder="Mínimo 6 caracteres" />
                 {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label>Cédula</Label>
+                <Input value={cedula} onChange={e => setCedula(e.target.value.toUpperCase())} placeholder="V-12345678" />
               </div>
               <div className="space-y-2">
                 <Label>Teléfono</Label>
