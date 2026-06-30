@@ -140,12 +140,12 @@ export default function ProductosPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Productos</h1>
           <p className="text-sm text-muted-foreground mt-1">Gestión de productos del sistema</p>
         </div>
-        <Button onClick={() => setShowNew(!showNew)} className="gap-2"><Plus className="w-4 h-4" /> Nuevo Producto</Button>
+        <Button onClick={() => setShowNew(!showNew)} className="gap-2 w-full sm:w-auto"><Plus className="w-4 h-4" /> Nuevo Producto</Button>
       </div>
 
       {showNew && (
@@ -191,17 +191,17 @@ export default function ProductosPage() {
                 </Button>
               </div>
             </div>
-            <div className="md:col-span-3 flex gap-2">
-              <Button type="submit">Crear Producto</Button>
-              <Button type="button" variant="outline" onClick={() => setShowNew(false)}>Cancelar</Button>
+            <div className="md:col-span-3 flex flex-col sm:flex-row gap-2">
+              <Button type="submit" className="w-full sm:w-auto">Crear Producto</Button>
+              <Button type="button" variant="outline" onClick={() => setShowNew(false)} className="w-full sm:w-auto">Cancelar</Button>
             </div>
           </form>
         </Card>
       )}
 
-      <div className="relative max-w-xs">
+      <div className="relative w-full sm:max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="Buscar producto..." value={filter} onChange={e => setFilter(e.target.value.toUpperCase())} className="pl-9" />
+        <Input placeholder="Buscar producto..." value={filter} onChange={e => setFilter(e.target.value.toUpperCase())} className="pl-9 w-full" />
       </div>
 
       <div className="space-y-2">
@@ -258,7 +258,7 @@ export default function ProductosPage() {
                       <span className="text-xs text-muted-foreground">Sin códigos</span>
                     )}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Input
                       value={newBarcodeInput}
                       onChange={e => {
@@ -268,7 +268,7 @@ export default function ProductosPage() {
                       inputMode="numeric"
                       pattern="[0-9]*"
                       placeholder="Agregar código..."
-                      className="h-8 text-xs"
+                      className="h-8 text-xs min-w-[120px] flex-1"
                       onKeyDown={e => { 
                         if (e.key === 'Enter') { 
                           e.preventDefault(); 
@@ -298,42 +298,46 @@ export default function ProductosPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-2 pt-1">
-                  <Button size="sm" onClick={() => handleSave(p.id)} className="gap-1"><Check className="w-3.5 h-3.5" /> Guardar</Button>
-                  <Button size="sm" variant="outline" onClick={() => setEditId(null)} className="gap-1"><X className="w-3.5 h-3.5" /> Cancelar</Button>
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <Button size="sm" onClick={() => handleSave(p.id)} className="gap-1 w-full sm:w-auto"><Check className="w-3.5 h-3.5" /> Guardar</Button>
+                  <Button size="sm" variant="outline" onClick={() => setEditId(null)} className="gap-1 w-full sm:w-auto"><X className="w-3.5 h-3.5" /> Cancelar</Button>
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <ShoppingBag className="w-5 h-5 text-primary" />
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <ShoppingBag className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{p.nombre}</p>
+                    <p className="text-sm text-muted-foreground truncate">{p.descripcion || '—'}</p>
+                    {(p.producto_codigo || []).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {(p.producto_codigo || []).slice(0, 4).map(bc => (
+                          <span key={bc.id} className="inline-flex items-center gap-1 text-xs bg-secondary/60 px-1.5 py-0.5 rounded">
+                            <Barcode className="w-2.5 h-2.5" />
+                            {bc.codigo}
+                          </span>
+                        ))}
+                        {(p.producto_codigo || []).length > 4 && (
+                          <span className="text-xs text-muted-foreground">+{p.producto_codigo.length - 4}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{p.nombre}</p>
-                  <p className="text-sm text-muted-foreground truncate">{p.descripcion || '—'}</p>
-                  {(p.producto_codigo || []).length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-1">
-                      {(p.producto_codigo || []).slice(0, 4).map(bc => (
-                        <span key={bc.id} className="inline-flex items-center gap-1 text-xs bg-secondary/60 px-1.5 py-0.5 rounded">
-                          <Barcode className="w-2.5 h-2.5" />
-                          {bc.codigo}
-                        </span>
-                      ))}
-                      {(p.producto_codigo || []).length > 4 && (
-                        <span className="text-xs text-muted-foreground">+{p.producto_codigo.length - 4}</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-col items-end gap-0.5 shrink-0">
-                  <Badge variant="secondary">{p.categoria?.nombre || '—'}</Badge>
-                  {p.subcategoria?.nombre && (
-                    <span className="text-xs text-muted-foreground">{p.subcategoria.nombre}</span>
-                  )}
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => startEdit(p)}><Pencil className="w-4 h-4" /></Button>
-                  <Button variant="ghost" size="icon" className="w-8 h-8 text-destructive" onClick={() => handleDelete(p.id, p.nombre)}><Trash2 className="w-4 h-4" /></Button>
+                <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                  <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:gap-0.5">
+                    <Badge variant="secondary">{p.categoria?.nombre || '—'}</Badge>
+                    {p.subcategoria?.nombre && (
+                      <span className="text-xs text-muted-foreground">{p.subcategoria.nombre}</span>
+                    )}
+                  </div>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="w-9 h-9 sm:w-8 sm:h-8" onClick={() => startEdit(p)}><Pencil className="w-4 h-4" /></Button>
+                    <Button variant="ghost" size="icon" className="w-9 h-9 sm:w-8 sm:h-8 text-destructive" onClick={() => handleDelete(p.id, p.nombre)}><Trash2 className="w-4 h-4" /></Button>
+                  </div>
                 </div>
               </div>
             )}
