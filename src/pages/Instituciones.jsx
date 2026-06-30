@@ -195,8 +195,8 @@ export default function InstitucionesPage() {
           <h3 className="font-semibold">Nueva Institución</h3>
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Nombre *</Label><Input value={newNombre} onChange={e => setNewNombre(e.target.value)} /></div>
-              <div className="space-y-2"><Label>Dirección *</Label><Input value={newDir} onChange={e => setNewDir(e.target.value)} /></div>
+              <div className="space-y-2"><Label>Nombre *</Label><Input value={newNombre} onChange={e => setNewNombre(e.target.value.toUpperCase())} /></div>
+              <div className="space-y-2"><Label>Dirección *</Label><Input value={newDir} onChange={e => setNewDir(e.target.value.toUpperCase())} /></div>
               <div className="space-y-2"><Label>Estado *</Label><SearchSelect options={estados} value={newEstado} onChange={setNewEstado} placeholder="Seleccionar..." /></div>
               <div className="space-y-2"><Label>Municipio *</Label><SearchSelect options={formMunicipios} value={newMunicipio} onChange={setNewMunicipio} placeholder={newEstado ? 'Seleccionar...' : 'Primero Estado'} /></div>
               <div className="space-y-2"><Label>Parroquia *</Label><SearchSelect options={formParroquias} value={newParroquia} onChange={setNewParroquia} placeholder={newMunicipio ? 'Seleccionar...' : 'Primero Municipio'} /></div>
@@ -213,7 +213,7 @@ export default function InstitucionesPage() {
             <Label className="text-xs">Buscar</Label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre o dirección..." className="pl-9" />
+              <Input value={search} onChange={e => setSearch(e.target.value.toUpperCase())} placeholder="Nombre o dirección..." className="pl-9" />
             </div>
           </div>
           <div className="space-y-1">
