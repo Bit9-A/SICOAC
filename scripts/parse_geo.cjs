@@ -21,7 +21,7 @@ for (const line of lines) {
 
   const municipioMatch = trimmed.match(/^###\s+(.+)/)
   if (municipioMatch && currentEstado) {
-    currentMunicipio = { nombre: municipioMatch[1].trim(), parroquias: [] }
+    currentMunicipio = { nombre: municipioMatch[1].trim().replace(/&NTILDE;/gi, '\u00D1').replace(/&ntilde;/gi, '\u00F1'), parroquias: [] }
     currentEstado.municipios.push(currentMunicipio)
     continue
   }
@@ -31,8 +31,8 @@ for (const line of lines) {
   const plainMatch = trimmed.match(/^-\s+(.+)/)
   if (currentMunicipio && (parroquiaMatch || plainMatch)) {
     const nombre = (parroquiaMatch || plainMatch)[1].trim()
-      .replace(/&NTILDE;/gi, 'N')
-      .replace(/&ntilde;/gi, 'n')
+      .replace(/&NTILDE;/gi, '\u00D1')
+      .replace(/&ntilde;/gi, '\u00F1')
       .replace(/&#(\d+);/g, (_, c) => String.fromCharCode(c))
     if (nombre && !nombre.startsWith('#')) {
       currentMunicipio.parroquias.push(nombre)
