@@ -39,6 +39,7 @@ export default function UsuariosPage() {
   const [nombre, setNombre] = useState('')
   const [apellido, setApellido] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [cedula, setCedula] = useState('')
   const [rol, setRol] = useState('operador')
   const [instId, setInstId] = useState('')
   const [dispDias, setDispDias] = useState([])
@@ -53,8 +54,23 @@ export default function UsuariosPage() {
     { key: 'D', label: 'Dom' },
   ]
 
+  const HORAS = Array.from({ length: 33 }, (_, i) => {
+    const h = Math.floor(i / 2) + 6; const m = i % 2 === 0 ? '00' : '30'
+    return `${String(h).padStart(2, '0')}:${m}`
+  })
+
   function toggleDia(key) {
     setDispDias(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key])
+  }
+
+  function formatPhone(value) {
+    const digits = value.replace(/\D/g, '')
+    if (!digits) return ''
+    let n = digits
+    if (n.startsWith('58') && n.length > 2) n = n.slice(2)
+    else if (n.startsWith('0')) n = n.slice(1)
+    const operador = n.slice(0, 3); const num = n.slice(3, 10)
+    return num ? `${operador}-${num}` : operador
   }
 
   useEffect(() => { loadUsuarios(); loadInstituciones() }, [])
@@ -94,9 +110,13 @@ export default function UsuariosPage() {
 
     setLoading(true)
     try {
-      await signUp({ username: normUsername, password, nombre: normNombre, apellido: normApellido, telefono: normTel, rol, institucionId: instId || null, disponibilidadDias: dispDias.join(','), disponibilidadHoraDesde: dispDesde || null, disponibilidadHoraHasta: dispHasta || null })
+      // Verificar username único
+      const { data: exist } = await supabase.from('usuarios').select('id').eq('username', normUsername).maybeSingle()
+      if (exist) { setErrors({ username: 'El nombre de usuario ya existe' }); setLoading(false); return }
+
+      await signUp({ username: normUsername, password, nombre: normNombre, apellido: normApellido, cedula: cedula.trim() || null, telefono: normTel, rol, institucionId: instId || null, disponibilidadDias: dispDias.join(','), disponibilidadHoraDesde: dispDesde || null, disponibilidadHoraHasta: dispHasta || null })
       toast.success('Usuario creado')
-      setShowForm(false); setUsername(''); setPassword(''); setNombre(''); setApellido(''); setTelefono(''); setRol('operador'); setInstId(''); setDispDias([]); setDispDesde(''); setDispHasta(''); setErrors({})
+      setShowForm(false); setUsername(''); setPassword(''); setNombre(''); setApellido(''); setCedula(''); setTelefono(''); setRol('operador'); setInstId(''); setDispDias([]); setDispDesde(''); setDispHasta(''); setErrors({})
       loadUsuarios()
     } catch (err) { toast.error(err.message) } finally { setLoading(false) }
   }
@@ -152,8 +172,12 @@ export default function UsuariosPage() {
                 {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
               </div>
               <div className="space-y-2">
+                <Label>Cédula</Label>
+                <Input value={cedula} onChange={e => setCedula(e.target.value.toUpperCase())} placeholder="V-12345678" />
+              </div>
+              <div className="space-y-2">
                 <Label>Teléfono</Label>
-                <Input value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="0412-1234567" />
+                <Input value={telefono} onChange={e => setTelefono(formatPhone(e.target.value))} placeholder="412-7445102" />
               </div>
               <div className="space-y-2">
                 <Label>Rol *</Label>
@@ -181,11 +205,19 @@ export default function UsuariosPage() {
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   <div>
                     <Label className="text-xs">Desde</Label>
-                    <Input type="time" value={dispDesde} onChange={e => setDispDesde(e.target.value)} className="h-9" />
+                    <select value={dispDesde} onChange={e => setDispDesde(e.target.value)}
+                      className="flex h-9 w-full rounded-lg border border-input bg-secondary px-3 text-sm">
+                      <option value="">—</option>
+                      {HORAS.filter(h => !dispHasta || h < dispHasta).map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
                   </div>
                   <div>
                     <Label className="text-xs">Hasta</Label>
-                    <Input type="time" value={dispHasta} onChange={e => setDispHasta(e.target.value)} className="h-9" />
+                    <select value={dispHasta} onChange={e => setDispHasta(e.target.value)}
+                      className="flex h-9 w-full rounded-lg border border-input bg-secondary px-3 text-sm">
+                      <option value="">—</option>
+                      {HORAS.filter(h => !dispDesde || h > dispDesde).map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
                   </div>
                 </div>
               </div>

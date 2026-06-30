@@ -10,7 +10,7 @@ import { CreateSelect } from '@/components/ui/create-select'
 import {
   sendRecord, isConfigured, getEstados, getMunicipios, getParroquias,
   getInstituciones, createInstitucion, getCategorias, createCategoria,
-  searchBarcodes, searchProducts, findProductByBarcode,
+  getSubcategorias, searchBarcodes, searchProducts, findProductByBarcode,
 } from '@/lib/api'
 import { supabase } from '@/lib/supabase'
 import { addToQueue, incrementSessionCount } from '@/lib/storage'
@@ -52,6 +52,8 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
   const [productSearching, setProductSearching] = useState(false)
   const [description, setDescription] = useState('')
   const [categoryId, setCategoryId] = useState('')
+  const [subcategorias, setSubcategorias] = useState([])
+  const [subcategoriaId, setSubcategoriaId] = useState('')
   const [presentation, setPresentation] = useState('')
   const [quantity, setQuantity] = useState('')
 
@@ -66,15 +68,19 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
   const municipioLabel = municipios.find(m => String(m.value) === String(municipioId))?.label
   const parroquiaLabel = parroquias.find(p => String(p.value) === String(parroquiaId))?.label
 
+  const subcategoriasPorCat = (catId) =>
+    catId ? subcategorias.filter(s => String(s.categoriaId) === String(catId)) : []
+
   // Load initial options
   useEffect(() => {
     async function load() {
-      const [ests, insts, cats] = await Promise.all([
-        getEstados(), getInstituciones(), getCategorias()
+      const [ests, insts, cats, subs] = await Promise.all([
+        getEstados(), getInstituciones(), getCategorias(), getSubcategorias()
       ])
       setEstados(ests)
       setInstituciones(insts)
       setCategorias(cats)
+      setSubcategorias(subs)
 
       // Auto-select institution del usuario (operador o admin)
       if (userInstId) {
@@ -137,6 +143,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
       setProduct(found.productName)
       setDescription(found.description || '')
       setCategoryId(found.categoryId)
+      setSubcategoriaId(found.subcategoriaId ? String(found.subcategoriaId) : '')
       setPresentation(found.presentation || '')
       toast.info(`Producto autocompletado: ${found.productName}`)
       setTimeout(() => quantityRef.current?.focus(), 100)
@@ -154,6 +161,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
           setProduct(prod.productName)
           setDescription(prod.description || '')
           setCategoryId(prod.categoryId)
+          setSubcategoriaId(prod.subcategoriaId ? String(prod.subcategoriaId) : '')
           setPresentation(prod.presentation || '')
           toast.info(`Producto autocompletado: ${prod.productName}`)
           setTimeout(() => quantityRef.current?.focus(), 100)
@@ -179,6 +187,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
       setProduct(found.productName)
       setDescription(found.description || '')
       setCategoryId(found.categoryId)
+      setSubcategoriaId(found.subcategoriaId ? String(found.subcategoriaId) : '')
       setPresentation(found.presentation || '')
       toast.info(`Producto seleccionado: ${found.productName}`)
       setTimeout(() => quantityRef.current?.focus(), 100)
@@ -234,6 +243,8 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     if (!quantity || quantity.trim() === '' || isNaN(qty) || qty <= 0) newErrors.quantity = 'Ingresa una cantidad positiva'
 
     const isTransfer = tipoMovimiento === 'Transferencia'
+    const isSalida = tipoMovimiento === 'Salida'
+
     if (isTransfer) {
       if (!institucionOrigenId) newErrors.institucionOrigenId = 'Selecciona el origen'
       if (!institucionDestinoId) newErrors.institucionDestinoId = 'Selecciona el destino'
@@ -245,6 +256,35 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     }
 
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); toast.warning('Corrige los campos marcados'); return }
+
+    // Validar stock antes de salida/transferencia
+    if ((isSalida || isTransfer) && !isNaN(qty) && qty > 0) {
+      const instId = isTransfer ? institucionOrigenId : institucionId
+      if (instId && barcodeOptions.length > 0) {
+        // Buscar el productoId desde barcodeOptions o productOptions
+        let prodId = null
+        const barcFound = barcodeOptions.find(o => o.value === barcode)
+        if (barcFound) prodId = barcFound.productId
+        if (!prodId) {
+          const prodFound = productOptions.find(o => o.value === product)
+          if (prodFound) prodId = prodFound.productId
+        }
+        if (prodId) {
+          const { data: stockData } = await supabase
+            .from('inventario')
+            .select('cantidad')
+            .eq('producto_id', prodId)
+            .eq('institucion_id', instId)
+            .maybeSingle()
+          const disponible = Number(stockData?.cantidad || 0)
+          if (qty > disponible) {
+            setErrors({ quantity: `Stock insuficiente: disponible ${disponible}, requerido ${qty}` })
+            toast.error(`Stock insuficiente: solo hay ${disponible} unidades disponibles`)
+            return
+          }
+        }
+      }
+    }
 
     setErrors({})
     setSaving(true)
@@ -267,6 +307,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
         description: normalizeText(description),
         quantity: qty,
         categoryId,
+        subcategoriaId: subcategoriaId || null,
         presentation: presentation || 'unidades',
       }
 
@@ -290,6 +331,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
         tipoMovimiento: isTransfer ? 'Transferencia' : (isOperator ? 'Entrada' : tipoMovimiento),
         barcode: barcode.trim(), productName: normalizeText(product),
         description: normalizeText(description), quantity: qty, categoryId,
+        subcategoriaId: subcategoriaId || null,
         presentation: presentation || 'unidades',
       })
       resetForm()
@@ -302,7 +344,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
   function resetForm() {
     setBarcode(''); setBarcodeOptions([])
     setProduct(''); setProductOptions([])
-    setDescription(''); setCategoryId(''); setPresentation(''); setQuantity('')
+    setDescription(''); setCategoryId(''); setSubcategoriaId(''); setPresentation(''); setQuantity('')
     setErrors({})
     if (isOperator) {
       setStep(2)
@@ -543,8 +585,18 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
 
               <div className="space-y-2">
                 <Label htmlFor="category">Categoría <span className="text-destructive">*</span></Label>
-                <CreateSelect id="category" options={categorias} value={categoryId} onChange={val => { setCategoryId(val); if (errors.categoryId) setErrors(p => ({...p, categoryId: null})) }} onCreate={handleCreateCategory} placeholder="Seleccionar o escribir..." createMessage="Crear categoría" displayValue={typeof categoryId === 'string' && !categorias.some(c => String(c.value) === String(categoryId)) ? categoryId : undefined} />
+                <CreateSelect id="category" options={categorias} value={categoryId} onChange={val => { setCategoryId(val); setSubcategoriaId(''); if (errors.categoryId) setErrors(p => ({...p, categoryId: null})) }} onCreate={handleCreateCategory} placeholder="Seleccionar o escribir..." createMessage="Crear categoría" displayValue={typeof categoryId === 'string' && !categorias.some(c => String(c.value) === String(categoryId)) ? categoryId : undefined} />
                 {errors.categoryId && <p className="text-xs text-destructive">{errors.categoryId}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subcategory">Subcategoría</Label>
+                <SearchSelect
+                  id="subcategory"
+                  options={subcategoriasPorCat(categoryId)}
+                  value={subcategoriaId}
+                  onChange={setSubcategoriaId}
+                  placeholder={categoryId ? 'Seleccionar...' : 'Primero selecciona una categoría'}
+                />
               </div>
             </Card>
 
