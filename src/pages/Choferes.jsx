@@ -27,7 +27,7 @@ export default function ChoferesPage() {
 
   async function load() {
     const { data, error } = await supabase
-      .from('chofer') // <-- ASEGÚRATE DE QUE NO SEA 'choferes'
+      .from('chofer')
       .select('*')
       .order('nombre')
     
@@ -49,7 +49,7 @@ export default function ChoferesPage() {
     }
 
     const { error } = await supabase.from('chofer').insert({
-      cedula: newCedula.trim().toUpperCase(),
+      cedula: newCedula.trim(),
       nombre: normalizeText(newNombre),
       apellido: normalizeText(newApellido),
       telefono: newTelefono.trim()
@@ -71,7 +71,6 @@ export default function ChoferesPage() {
       return toast.warning('Nombre, apellido y teléfono son obligatorios')
     }
 
-    // Usamos count: 'exact' para obligar a Supabase a decirnos si realmente editó algo
     const { error, count } = await supabase
       .from('chofer')
       .update({
@@ -83,7 +82,6 @@ export default function ChoferesPage() {
 
     if (error) return toast.error('Error de Supabase: ' + error.message)
     
-    // Si el conteo es 0, es porque la fila no se modificó (Problema de ID o RLS)
     if (count === 0) {
       return toast.error('No se modificó ninguna fila. Verifica si el ID es correcto o si hay políticas RLS activadas.')
     }
@@ -144,19 +142,35 @@ export default function ChoferesPage() {
           <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Cédula *</Label>
-              <Input placeholder="Ej: V-12345678" value={newCedula} onChange={e => setNewCedula(e.target.value)} />
+              <Input 
+                placeholder="Ej: V-12345678" 
+                value={newCedula} 
+                onChange={e => {
+                  const value = e.target.value.replace(/\D/g, '')
+                  setNewCedula(value)
+                }}
+                inputMode="numeric"
+                pattern="[0-9]*"
+              />
             </div>
             <div className="space-y-2">
               <Label>Nombre *</Label>
-              <Input placeholder="Ej: Juan" value={newNombre} onChange={e => setNewNombre(e.target.value)} />
+              <Input placeholder="Ej: Juan" value={newNombre} onChange={e => setNewNombre(e.target.value.toUpperCase())} />
             </div>
             <div className="space-y-2">
               <Label>Apellido *</Label>
-              <Input placeholder="Ej: Pérez" value={newApellido} onChange={e => setNewApellido(e.target.value)} />
+              <Input placeholder="Ej: Pérez" value={newApellido} onChange={e => setNewApellido(e.target.value.toUpperCase())} />
             </div>
             <div className="space-y-2">
               <Label>Teléfono *</Label>
-              <Input placeholder="Ej: 04141234567" value={newTelefono} onChange={e => setNewTelefono(e.target.value)} />
+              <Input 
+                placeholder="Ej: 0414-1234567" 
+                value={newTelefono} 
+                onChange={e => {
+                  const value = e.target.value.replace(/[^0-9()+\-]/g, '')
+                  setNewTelefono(value)
+                }}
+              />
             </div>
             <div className="md:col-span-4 flex gap-2">
               <Button type="submit">Registrar Chofer</Button>
@@ -168,7 +182,7 @@ export default function ChoferesPage() {
 
       <div className="relative max-w-xs">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="Buscar por nombre, apellido o cédula..." value={filter} onChange={e => setFilter(e.target.value)} className="pl-9" />
+        <Input placeholder="Buscar por nombre, apellido o cédula..." value={filter} onChange={e => setFilter(e.target.value.toUpperCase())} className="pl-9" />
       </div>
 
       <div className="space-y-2">
@@ -183,15 +197,21 @@ export default function ChoferesPage() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Nombre</Label>
-                    <Input value={editNombre} onChange={e => setEditNombre(e.target.value)} />
+                    <Input value={editNombre} onChange={e => setEditNombre(e.target.value.toUpperCase())} />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Apellido</Label>
-                    <Input value={editApellido} onChange={e => setEditApellido(e.target.value)} />
+                    <Input value={editApellido} onChange={e => setEditApellido(e.target.value.toUpperCase())} />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Teléfono</Label>
-                    <Input value={editTelefono} onChange={e => setEditTelefono(e.target.value)} />
+                    <Input 
+                      value={editTelefono} 
+                      onChange={e => {
+                        const value = e.target.value.replace(/[^0-9()+\-]/g, '')
+                        setEditTelefono(value)
+                      }}
+                    />
                   </div>
                 </div>
 
@@ -211,7 +231,7 @@ export default function ChoferesPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium truncate">{c.nombre} {c.apellido}</p>
+                    <p className="font-medium truncate">{c.nombre.toUpperCase()} {c.apellido.toUpperCase()}</p>
                     <Badge variant={c.activo ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0.5">
                       {c.activo ? 'Activo' : 'Inactivo'}
                     </Badge>
