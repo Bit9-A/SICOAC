@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   Truck, Plus, Search, X, Printer, Eye, Package, Building2, PlusCircle,
-  FileText, Contact, Hash, CheckCircle, XCircle, AlertTriangle, ArrowUpRight, ArrowDownLeft, Download
+  FileText, Contact, Hash, CheckCircle, XCircle, AlertTriangle, ArrowUpRight, ArrowDownLeft, Download, ScanLine
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,10 +11,12 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { SearchSelect } from '@/components/ui/search-select'
 import { supabase } from '@/lib/supabase'
+import { findProductByBarcode } from '@/lib/api'
 import { getInstituciones } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { normalizeText } from '@/lib/utils'
 import { toast } from 'sonner'
+import Scanner from '@/pages/Scanner'
 
 // Importamos la librería para conversión a PDF
 import html2pdf from 'html2pdf.js'
@@ -49,6 +51,7 @@ export default function DespachosPage() {
   const [prodSearching, setProdSearching] = useState(false)
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
+  const [showScanner, setShowScanner] = useState(false)
 
   useEffect(() => { 
     if (view === 'list') fetchDespachos() 
@@ -151,14 +154,24 @@ export default function DespachosPage() {
   }
 
   function updateCant(id, val) {
-    const num = Math.max(1, Number(val) || 1)
     setCart(cart.map(c => {
-      if (c.id === id) {
-        if (num > c.maxStock) {
-          toast.warning(`Cantidad ajustada al stock máximo disponible (${c.maxStock})`)
-          return { ...c, cantidad: c.maxStock }
-        }
-        return { ...c, cantidad: num }
+      if (c.id !== id) return c
+      if (val === '' || val === '0') return { ...c, cantidad: val }
+      const num = Number(val)
+      if (isNaN(num) || num < 1) return c
+      if (num > c.maxStock) {
+        toast.warning(`Cantidad ajustada al stock máximo disponible (${c.maxStock})`)
+        return { ...c, cantidad: c.maxStock }
+      }
+      return { ...c, cantidad: num }
+    }))
+  }
+
+  function handleCantBlur(id) {
+    setCart(cart.map(c => {
+      if (c.id !== id) return c
+      if (c.cantidad === '' || c.cantidad === '0' || Number(c.cantidad) < 1) {
+        return { ...c, cantidad: 1 }
       }
       return c
     }))
@@ -400,6 +413,27 @@ export default function DespachosPage() {
     setCart(cart.filter(item => item.id !== id))
   }
 
+  async function handleBarcodeDetected(code) {
+    setShowScanner(false)
+    if (!origenId) return toast.warning('Selecciona un origen primero')
+
+    const prod = await findProductByBarcode(code)
+    if (!prod) return toast.error('Producto no encontrado para el código: ' + code)
+
+    const { data: inv } = await supabase
+      .from('inventario')
+      .select('cantidad')
+      .eq('producto_id', prod.id)
+      .eq('institucion_id', Number(origenId))
+      .maybeSingle()
+
+    const stockDisponible = inv ? Number(inv.cantidad) : 0
+    if (stockDisponible <= 0) return toast.warning('No hay stock disponible de este producto en el origen')
+
+    addToCart({ productId: prod.id, productName: prod.productName, presentation: prod.presentation, stockDisponible })
+    toast.success(`${prod.productName} añadido por código de barras`)
+  }
+
   const esInstitucionReceptora = guia ? String(guia.institucion_destino_id) === String(institucionId) : false
   const esInstitucionEmisora = guia ? String(guia.institucion_origen_id) === String(institucionId) : false
 
@@ -608,24 +642,29 @@ export default function DespachosPage() {
 
           <Card className="p-4 md:p-5 space-y-4">
             <h3 className="font-semibold flex items-center gap-2 text-slate-800"><Package className="w-4 h-4 text-primary" /> Carga de Suministros (Lector / Manual)</h3>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input value={prodSearch} onChange={e => setProdSearch(e.target.value)} placeholder="Escanea código de barras o escribe nombre del insumo..." className="pl-9" />
-              {prodResults.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full rounded-lg border bg-popover shadow-lg max-h-48 overflow-auto">
-                  {prodResults.map(p => (
-                    <button key={p.productId} type="button" onClick={() => addToCart(p)}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-secondary flex items-center gap-2 border-b last:border-0">
-                      <PlusCircle className="w-4 h-4 shrink-0 text-primary" />
-                      <div className="flex flex-col">
-                        <span className="font-medium text-slate-900">{p.productName}</span>
-                        <span className="text-[11px] text-emerald-600 font-medium">Disponible en este almacén: {p.stockDisponible} {p.presentation || 'unidades'}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {prodSearching && <p className="text-xs text-muted-foreground mt-1 animate-pulse">Buscando existencias reales...</p>}
+            <div className="relative flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input value={prodSearch} onChange={e => setProdSearch(e.target.value)} placeholder="Buscar producto por nombre..." className="pl-9 pr-2" />
+                {prodResults.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full rounded-lg border bg-popover shadow-lg max-h-48 overflow-auto">
+                    {prodResults.map(p => (
+                      <button key={p.productId} type="button" onClick={() => addToCart(p)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-secondary flex items-center gap-2 border-b last:border-0">
+                        <PlusCircle className="w-4 h-4 shrink-0 text-primary" />
+                        <div className="flex flex-col">
+                          <span className="font-medium text-slate-900">{p.productName}</span>
+                          <span className="text-[11px] text-emerald-600 font-medium">Disponible en este almacén: {p.stockDisponible} {p.presentation || 'unidades'}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {prodSearching && <p className="text-xs text-muted-foreground mt-1 animate-pulse">Buscando existencias reales...</p>}
+              </div>
+              <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => setShowScanner(true)} title="Escanear código de barras">
+                <ScanLine className="w-4 h-4" />
+              </Button>
             </div>
 
             {cart.length === 0 ? (
@@ -636,9 +675,12 @@ export default function DespachosPage() {
                   <div key={item.id} className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm">
                     <Package className="w-4 h-4 text-slate-400 shrink-0" />
                     <span className="flex-1 text-sm font-medium text-slate-800 truncate">{item.nombre}</span>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Input type="number" min="1" max={item.maxStock} value={item.cantidad} onChange={e => updateCant(item.id, e.target.value)}
-                        className="w-20 h-8 text-sm text-center" />
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge variant="outline" className="text-[10px] font-normal text-emerald-600 border-emerald-200 bg-emerald-50 whitespace-nowrap">
+                        Stock: {item.maxStock}
+                      </Badge>
+                      <Input type="number" value={item.cantidad} onChange={e => updateCant(item.id, e.target.value)} onBlur={() => handleCantBlur(item.id)}
+                        className="w-20 h-8 text-sm text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
                       <Badge variant="secondary" className="text-xs font-normal">{item.unidad}</Badge>
                     </div>
                     <Button type="button" variant="ghost" size="icon" onClick={() => removeFromCart(item.id)} className="w-8 h-8 text-destructive hover:text-destructive hover:bg-destructive/10">
@@ -817,6 +859,15 @@ export default function DespachosPage() {
             }
           `}</style>
         </div>
+      )}
+
+      {/* Scanner overlay */}
+      {showScanner && (
+        <Scanner
+          onDetected={handleBarcodeDetected}
+          onClose={() => setShowScanner(false)}
+          onManual={() => setShowScanner(false)}
+        />
       )}
     </div>
   )
