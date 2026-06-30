@@ -36,7 +36,8 @@ function formatPhone(value) {
 
 export default function VoluntarioRegistroPage() {
   const params = new URLSearchParams(window.location.search)
-  const instId = params.get('inst')
+  const rawInst = params.get('inst')
+  const instId = rawInst && rawInst !== 'null' ? rawInst : null
 
   const [cedula, setCedula] = useState('')
   const [nombre, setNombre] = useState('')
