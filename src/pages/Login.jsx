@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { LogIn, UserPlus, ScanLine, Clock, Eye, EyeOff } from 'lucide-react'
+import { LogIn, UserPlus, ScanLine, Clock, Eye, EyeOff, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -100,7 +100,7 @@ export default function Login({ onLogin, defaultInstitucionId }) {
       toast.warning('Campos incompletos', {
         description: 'Por favor, escribe tu usuario y contraseña para ingresar.',
       })
-      setError('Completa usuario y contraseña')
+      setError('Por favor, ingresa tu usuario y contraseña.')
       return
     }
     
@@ -110,19 +110,20 @@ export default function Login({ onLogin, defaultInstitucionId }) {
       toast.success(`Bienvenido, ${username}`)
       onLogin?.()
     } catch (err) {
-      if (err.message?.includes('Invalid login credentials') || err.status === 400) {
-        const msgError = 'El usuario o la contraseña son incorrectos. Verifica e intenta de nuevo.'
+      const isCredentialError = err.message?.includes('Invalid login credentials') || err.status === 400 || err.message?.includes('creden')
+      
+      if (isCredentialError) {
+        const msgError = 'El usuario o la contraseña no coinciden. Por favor, verificalo e intenta nuevamente.'
         setError(msgError)
         
-        // Notificación flotante notable con sonner
-        toast.error('Error de acceso', {
-          description: msgError,
+        toast.error('Acceso denegado', {
+          description: 'Credenciales inválidas. Revisa tus datos.',
           duration: 5000,
         })
       } else {
-        const msgGenerico = err.message || 'Error al iniciar sesión'
+        const msgGenerico = 'Hubo un problema de conexión al validar tus datos. Intenta más tarde.'
         setError(msgGenerico)
-        toast.error('Error de inicio de sesión', { description: msgGenerico })
+        toast.error('Error del sistema', { description: err.message || msgGenerico })
       }
     } finally {
       setLoading(false)
@@ -134,15 +135,15 @@ export default function Login({ onLogin, defaultInstitucionId }) {
     setError('')
 
     if (!username.trim() || !password || !nombre.trim() || !apellido.trim()) {
-      setError('Completa todos los campos obligatorios')
+      setError('Por favor, rellena todos los campos obligatorios (*).')
       return
     }
     if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres')
+      setError('La contraseña es muy corta. Debe tener al menos 6 caracteres.')
       return
     }
     if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden')
+      setError('Las contraseñas ingresadas no coinciden. Verifícalas.')
       return
     }
 
@@ -153,7 +154,7 @@ export default function Login({ onLogin, defaultInstitucionId }) {
       const normUsername = username.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
       const { data: exist } = await supabase.from('usuarios').select('id').eq('username', normUsername).maybeSingle()
-      if (exist) { setError('El nombre de usuario ya está registrado'); setLoading(false); return }
+      if (exist) { setError('Este nombre de usuario ya se encuentra registrado.'); setLoading(false); return }
 
       await signUp({
         username: normUsername,
@@ -168,13 +169,13 @@ export default function Login({ onLogin, defaultInstitucionId }) {
         disponibilidadHoraDesde: dispDesde || null,
         disponibilidadHoraHasta: dispHasta || null,
       })
-      toast.success('Usuario creado — ahora inicia sesión')
+      toast.success('¡Registro exitoso! Ya puedes iniciar sesión.')
       setMode('login')
       setPassword(''); setConfirmPassword('')
       setNombre(''); setApellido(''); setTelefono('')
       setDispDias([]); setDispDesde(''); setDispHasta('')
     } catch (err) {
-      setError(err.message || 'Error al registrar')
+      setError(err.message || 'No se pudo completar el registro. Intenta de nuevo.')
     } finally {
       setLoading(false)
     }
@@ -229,7 +230,13 @@ export default function Login({ onLogin, defaultInstitucionId }) {
                 </div>
               </div>
 
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {/* Contenedor de Error Amigable */}
+              {error && (
+                <div className="flex items-start gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive border border-destructive/20 animate-in fade-in-50 duration-200">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
 
               <Button type="submit" size="lg" className="w-full gap-2" disabled={loading}>
                 <LogIn className="w-4 h-4" />
@@ -394,7 +401,13 @@ export default function Login({ onLogin, defaultInstitucionId }) {
                 </div>
               </div>
 
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {/* Contenedor de Error Amigable Registro */}
+              {error && (
+                <div className="flex items-start gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive border border-destructive/20 animate-in fade-in-50 duration-200">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
 
               <Button type="submit" size="lg" className="w-full gap-2" disabled={loading}>
                 <UserPlus className="w-4 h-4" />
