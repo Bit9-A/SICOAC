@@ -159,6 +159,14 @@ export async function getProfile(userId) {
 }
 
 /**
+ * Cambiar contraseña del usuario actual
+ */
+export async function updatePassword(newPassword) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw error
+}
+
+/**
  * Suscribirse a cambios de auth (ej: sesión expirada)
  */
 export function onAuthChange(callback) {
