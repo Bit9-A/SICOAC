@@ -652,7 +652,7 @@ export default function DespachosPage() {
 
           <Card className="p-4">
             <Label>Observaciones de Destino / Punto de Despliegue</Label>
-            <Textarea rows={2} value={detallesDestino} onChange={e => setDetallesDestino(e.target.value)} placeholder="Indica direcciones de escuelas, refugios, o detalles adicionales del destino..." className="mt-1.5" />
+            <Textarea rows={2} value={detallesDestino} onChange={e => setDetallesDestino(e.target.value.toUpperCase())} placeholder="Indica direcciones de escuelas, refugios, o detalles adicionales del destino..." className="mt-1.5" />
           </Card>
 
           <Button type="submit" size="lg" className="w-full gap-2 font-semibold" disabled={loading || cart.length === 0}>
