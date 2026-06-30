@@ -140,8 +140,8 @@ export default function ProductosPage() {
         <Card className="p-5 space-y-4">
           <h3 className="font-semibold">Nuevo Producto</h3>
           <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2"><Label>Nombre *</Label><Input value={newNombre} onChange={e => setNewNombre(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Descripción</Label><Input value={newDesc} onChange={e => setNewDesc(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Nombre *</Label><Input value={newNombre} onChange={e => setNewNombre(e.target.value.toUpperCase())} /></div>
+            <div className="space-y-2"><Label>Descripción</Label><Input value={newDesc} onChange={e => setNewDesc(e.target.value.toUpperCase())} /></div>
             <div className="space-y-2">
               <Label>Categoría *</Label>
               <SearchSelect
