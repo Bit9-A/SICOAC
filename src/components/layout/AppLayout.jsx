@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { cn } from '@/lib/utils'
 import Sidebar from './Sidebar'
 
 export default function AppLayout({
   rol, currentPage, onNavigate, onLogout, onOpenScan, user, profile, children
 }) {
   const [showConfirm, setShowConfirm] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const isOperator = rol === 'operador'
 
   function handleLogoutRequest() {
@@ -62,8 +64,13 @@ export default function AppLayout({
         onOpenScan={onOpenScan}
         user={user}
         profile={profile}
+        collapsed={sidebarCollapsed}
+        setCollapsed={setSidebarCollapsed}
       />
-      <main className="flex-1 overflow-y-auto overflow-x-hidden">
+      <main className={cn(
+        'flex-1 overflow-y-auto overflow-x-hidden',
+        sidebarCollapsed && 'pl-14 md:pl-0'
+      )}>
         {children}
       </main>
       {showConfirm && confirmDialog}
