@@ -40,7 +40,6 @@ export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpen
   const collapsedRef = useRef(collapsed)
   const touchStartRef = useRef(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
   const items = NAV_ITEMS[rol] || NAV_ITEMS.admin
 
   const initials = profile ? (profile.nombre?.[0] || '') + (profile.apellido?.[0] || '') : '?'
@@ -81,8 +80,7 @@ export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpen
     }
   }, [])
 
-  function handleLogout() {
-    setShowConfirm(false)
+  function handleLogoutClick() {
     setShowUserMenu(false)
     onLogout()
   }
@@ -175,7 +173,7 @@ export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpen
               <div className="px-4 pb-3 space-y-2">
                 <p className="text-xs text-muted-foreground capitalize">{profile.rol?.replace('_', ' ')}</p>
                 <button
-                  onClick={() => setShowConfirm(true)}
+                  onClick={handleLogoutClick}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
@@ -186,29 +184,6 @@ export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpen
           </div>
         )}
 
-        {/* Confirm dialog */}
-        {showConfirm && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowConfirm(false)}>
-            <div className="bg-card rounded-xl p-6 max-w-sm mx-4 shadow-xl" onClick={e => e.stopPropagation()}>
-              <h3 className="font-semibold text-lg">¿Cerrar sesión?</h3>
-              <p className="text-sm text-muted-foreground mt-2">¿Estás seguro de que deseas cerrar la sesión?</p>
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => setShowConfirm(false)}
-                  className="flex-1 px-4 py-2 rounded-lg text-sm font-medium border border-input hover:bg-secondary transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleLogout}
-                  className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                >
-                  Cerrar sesión
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </aside>
 
       {/* Mobile hamburger */}
