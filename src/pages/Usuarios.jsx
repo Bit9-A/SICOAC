@@ -53,8 +53,23 @@ export default function UsuariosPage() {
     { key: 'D', label: 'Dom' },
   ]
 
+  const HORAS = Array.from({ length: 33 }, (_, i) => {
+    const h = Math.floor(i / 2) + 6; const m = i % 2 === 0 ? '00' : '30'
+    return `${String(h).padStart(2, '0')}:${m}`
+  })
+
   function toggleDia(key) {
     setDispDias(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key])
+  }
+
+  function formatPhone(value) {
+    const digits = value.replace(/\D/g, '')
+    if (!digits) return ''
+    let n = digits
+    if (n.startsWith('58') && n.length > 2) n = n.slice(2)
+    else if (n.startsWith('0')) n = n.slice(1)
+    const operador = n.slice(0, 3); const num = n.slice(3, 10)
+    return num ? `${operador}-${num}` : operador
   }
 
   useEffect(() => { loadUsuarios(); loadInstituciones() }, [])
@@ -153,7 +168,7 @@ export default function UsuariosPage() {
               </div>
               <div className="space-y-2">
                 <Label>Teléfono</Label>
-                <Input value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="0412-1234567" />
+                <Input value={telefono} onChange={e => setTelefono(formatPhone(e.target.value))} placeholder="412-7445102" />
               </div>
               <div className="space-y-2">
                 <Label>Rol *</Label>
@@ -181,11 +196,19 @@ export default function UsuariosPage() {
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   <div>
                     <Label className="text-xs">Desde</Label>
-                    <Input type="time" value={dispDesde} onChange={e => setDispDesde(e.target.value)} className="h-9" />
+                    <select value={dispDesde} onChange={e => setDispDesde(e.target.value)}
+                      className="flex h-9 w-full rounded-lg border border-input bg-secondary px-3 text-sm">
+                      <option value="">—</option>
+                      {HORAS.filter(h => !dispHasta || h < dispHasta).map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
                   </div>
                   <div>
                     <Label className="text-xs">Hasta</Label>
-                    <Input type="time" value={dispHasta} onChange={e => setDispHasta(e.target.value)} className="h-9" />
+                    <select value={dispHasta} onChange={e => setDispHasta(e.target.value)}
+                      className="flex h-9 w-full rounded-lg border border-input bg-secondary px-3 text-sm">
+                      <option value="">—</option>
+                      {HORAS.filter(h => !dispDesde || h > dispDesde).map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
                   </div>
                 </div>
               </div>
