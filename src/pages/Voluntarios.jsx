@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { SearchSelect } from '@/components/ui/search-select'
 import { getVoluntarios, getInstituciones } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
-import { normalizeText } from '@/lib/utils'
+import { cn, normalizeText } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 
@@ -18,6 +18,13 @@ export default function VoluntariosPage() {
   const [instituciones, setInstituciones] = useState([])
   const [search, setSearch] = useState('')
   const [filtroInst, setFiltroInst] = useState('')
+  const [filtroDia, setFiltroDia] = useState('')
+
+  const DIAS = [
+    { key: 'L', label: 'Lun' }, { key: 'M', label: 'Mar' }, { key: 'MI', label: 'Mie' },
+    { key: 'J', label: 'Jue' }, { key: 'V', label: 'Vie' }, { key: 'S', label: 'Sab' },
+    { key: 'D', label: 'Dom' },
+  ]
 
   useEffect(() => { load() }, [])
 
@@ -36,6 +43,7 @@ export default function VoluntariosPage() {
             !normalizeText(v.email || '').includes(q)) return false
       }
       if (filtroInst && String(v.institucion_id) !== String(filtroInst)) return false
+      if (filtroDia && !(v.disponibilidad_dias || '').includes(filtroDia)) return false
       return true
     })
   }, [voluntarios, search, filtroInst])
@@ -70,7 +78,7 @@ export default function VoluntariosPage() {
         </Button>
       </div>
 
-      <Card className="p-4">
+      <Card className="p-4 space-y-3">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="space-y-1">
             <Label className="text-xs">Buscar</Label>
@@ -82,6 +90,21 @@ export default function VoluntariosPage() {
           <div className="space-y-1">
             <Label className="text-xs">Institución</Label>
             <SearchSelect options={instituciones} value={filtroInst} onChange={setFiltroInst} placeholder="Todas" />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Disponibilidad por día</Label>
+          <div className="flex flex-wrap gap-1.5">
+            <button onClick={() => setFiltroDia('')}
+              className={cn('px-2.5 py-1 rounded-lg text-xs border transition-colors',
+                !filtroDia ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary text-muted-foreground border-input'
+              )}>Todos</button>
+            {DIAS.map(d => (
+              <button key={d.key} onClick={() => setFiltroDia(d.key)}
+                className={cn('px-2.5 py-1 rounded-lg text-xs border transition-colors',
+                  filtroDia === d.key ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary text-muted-foreground border-input'
+                )}>{d.label}</button>
+            ))}
           </div>
         </div>
       </Card>

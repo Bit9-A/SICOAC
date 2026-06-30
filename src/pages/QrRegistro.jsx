@@ -13,9 +13,10 @@ export default function QrRegistroPage() {
   const [tipo, setTipo] = useState('operador') // operador | voluntario
 
   const instNombre = profile?.institucion?.nombre || 'Mi institución'
-  const registerUrl = tipo === 'operador'
+  const hasInst = Boolean(institucionId)
+  const registerUrl = !hasInst ? null : (tipo === 'operador'
     ? `${window.location.origin}/?inst=${institucionId}&register`
-    : `${window.location.origin}/voluntario?inst=${institucionId}`
+    : `${window.location.origin}/voluntario?inst=${institucionId}`)
 
   useEffect(() => {
     setQrReady(false)
@@ -28,6 +29,18 @@ export default function QrRegistroPage() {
       })
     }
   }, [registerUrl])
+
+  if (!hasInst) {
+    return (
+      <div className="p-4 md:p-6 max-w-lg mx-auto space-y-6">
+        <h1 className="text-2xl font-bold">Códigos QR</h1>
+        <Card className="p-6 text-center space-y-2">
+          <p className="text-muted-foreground">Tu usuario no tiene una institución asignada.</p>
+          <p className="text-sm text-muted-foreground">Para generar códigos QR, un super_admin debe asignarte una institución.</p>
+        </Card>
+      </div>
+    )
+  }
 
   const descripcion = tipo === 'operador'
     ? 'Al escanear este código, el voluntario puede registrarse como operador del sistema para registrar movimientos en tu centro.'
