@@ -161,6 +161,24 @@ export async function createCategoria(nombre) {
   return { value: data[0].id, label: data[0].nombre }
 }
 
+export async function getSubcategorias() {
+  const { data, error } = await supabase
+    .from('subcategoria')
+    .select('id, nombre, categoria_id, categoria:categoria_id(nombre)')
+    .order('nombre')
+  if (error) throw error
+  return data.map((s) => ({ value: s.id, label: s.nombre, categoriaId: s.categoria_id, categoriaNombre: s.categoria?.nombre }))
+}
+
+export async function createSubcategoria(nombre, categoriaId) {
+  const { data, error } = await supabase
+    .from('subcategoria')
+    .insert([{ nombre: normalizeText(nombre), categoria_id: categoriaId }])
+    .select()
+  if (error) throw error
+  return { value: data[0].id, label: data[0].nombre, categoriaId: data[0].categoria_id }
+}
+
 export async function searchBarcodes(query) {
   if (!query || query.trim().length < 2) return []
   const q = query.trim()
