@@ -645,7 +645,7 @@ export default function DespachosPage() {
             <div className="relative flex gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input value={prodSearch} onChange={e => setProdSearch(e.target.value)} placeholder="Buscar producto por nombre..." className="pl-9 pr-2" />
+                <Input value={prodSearch} onChange={e => setProdSearch(e.target.value.toUpperCase())} placeholder="Buscar producto por nombre..." className="pl-9 pr-2" />
                 {prodResults.length > 0 && (
                   <div className="absolute z-10 mt-1 w-full rounded-lg border bg-popover shadow-lg max-h-48 overflow-auto">
                     {prodResults.map(p => (
