@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Keyboard } from 'lucide-react'
+import { X, Keyboard, Zap, ZapOff, ZoomIn, ZoomOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { startCamera, stopCamera, startDetection, isScannerAvailable } from '@/lib/scanner'
+import { startCamera, stopCamera, startDetection, isScannerAvailable, getCameraCapabilities, applyCameraSettings } from '@/lib/scanner'
 
 export default function Scanner({ onDetected, onClose, onManual }) {
   const videoRef = useRef(null)
@@ -10,6 +10,12 @@ export default function Scanner({ onDetected, onClose, onManual }) {
   const [error, setError] = useState(null)
   const [detectedCode, setDetectedCode] = useState(null)
 
+  // Camera capabilities state
+  const [hasTorch, setHasTorch] = useState(false)
+  const [torchOn, setTorchOn] = useState(false)
+  const [hasZoom, setHasZoom] = useState(false)
+  const [zoomRange, setZoomRange] = useState({ min: 1, max: 1, step: 0.1 })
+  const [zoomVal, setZoomVal] = useState(1)
 
   // Focus management: Trap focus & Restore focus on unmount
   useEffect(() => {
@@ -49,19 +55,40 @@ export default function Scanner({ onDetected, onClose, onManual }) {
         setStatus('requesting')
         await startCamera(videoRef.current)
 
-        setStatus('scanning')
-        startDetection(videoRef.current, (code) => {
-          if (cancelled) return
-          setDetectedCode(code)
-          if (navigator.vibrate) navigator.vibrate(100)
-
-          // Esperar un momento para mostrar feedback, luego enviar
-          setTimeout(() => {
-            if (!cancelled) {
-              onDetected(code)
+        if (!cancelled) {
+          setStatus('scanning')
+          
+          // Get capabilities
+          const caps = getCameraCapabilities()
+          if (caps) {
+            const { capabilities, settings } = caps
+            if (capabilities.torch) {
+              setHasTorch(true)
             }
-          }, 500)
-        })
+            if (capabilities.zoom) {
+              setHasZoom(true)
+              setZoomRange({
+                min: capabilities.zoom.min || 1,
+                max: capabilities.zoom.max || 1,
+                step: capabilities.zoom.step || 0.1
+              })
+              setZoomVal(settings.zoom || capabilities.zoom.min || 1)
+            }
+          }
+
+          startDetection(videoRef.current, (code) => {
+            if (cancelled) return
+            setDetectedCode(code)
+            if (navigator.vibrate) navigator.vibrate(100)
+
+            // Esperar un momento para mostrar feedback, luego enviar
+            setTimeout(() => {
+              if (!cancelled) {
+                onDetected(code)
+              }
+            }, 500)
+          })
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err.message)
@@ -82,6 +109,18 @@ export default function Scanner({ onDetected, onClose, onManual }) {
     onClose()
   }
 
+  async function handleToggleTorch() {
+    const nextVal = !torchOn
+    setTorchOn(nextVal)
+    await applyCameraSettings({ torch: nextVal, zoom: zoomVal })
+  }
+
+  async function handleZoomChange(e) {
+    const val = parseFloat(e.target.value)
+    setZoomVal(val)
+    await applyCameraSettings({ torch: torchOn, zoom: val })
+  }
+
   return (
     <div
       ref={containerRef}
@@ -92,15 +131,28 @@ export default function Scanner({ onDetected, onClose, onManual }) {
       className="fixed inset-0 z-50 flex flex-col bg-black focus:outline-none"
     >
       {/* Top bar */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-black/80 z-10 shrink-0">
-        <Button variant="ghost" size="icon" onClick={handleClose} className="text-white/70 hover:text-white" aria-label="Cerrar escáner">
-          <X className="w-5 h-5" aria-hidden="true" />
-        </Button>
-        <span id="scanner-status-text" className="text-sm text-white/60">
-          {status === 'scanning' && 'Apunta al código de barras'}
-          {status === 'requesting' && 'Solicitando cámara...'}
-          {status === 'initializing' && 'Iniciando...'}
-        </span>
+      <div className="flex items-center justify-between px-4 py-3 bg-black/80 z-10 shrink-0 w-full">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={handleClose} className="text-white/70 hover:text-white" aria-label="Cerrar escáner">
+            <X className="w-5 h-5" aria-hidden="true" />
+          </Button>
+          <span id="scanner-status-text" className="text-sm text-white/60">
+            {status === 'scanning' && 'Apunta al código de barras'}
+            {status === 'requesting' && 'Solicitando cámara...'}
+            {status === 'initializing' && 'Iniciando...'}
+          </span>
+        </div>
+        {status === 'scanning' && hasTorch && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleToggleTorch}
+            className={`text-white/70 hover:text-white rounded-full transition-colors ${torchOn ? 'bg-primary/20 text-yellow-400 hover:text-yellow-300' : ''}`}
+            aria-label={torchOn ? 'Apagar flash' : 'Encender flash'}
+          >
+            {torchOn ? <Zap className="w-5 h-5 fill-current" /> : <ZapOff className="w-5 h-5" />}
+          </Button>
+        )}
       </div>
 
       {/* Camera viewport */}
@@ -132,6 +184,26 @@ export default function Scanner({ onDetected, onClose, onManual }) {
               El código se detecta automáticamente
             </p>
           </>
+        )}
+
+        {/* Zoom Control Overlay */}
+        {status === 'scanning' && hasZoom && !detectedCode && (
+          <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 w-4/5 max-w-xs bg-black/60 backdrop-blur-sm px-4 py-2.5 rounded-full flex items-center gap-3 border border-white/10 shadow-lg z-20">
+            <ZoomOut className="w-4 h-4 text-white/60 shrink-0" />
+            <input
+              type="range"
+              min={zoomRange.min}
+              max={zoomRange.max}
+              step={zoomRange.step}
+              value={zoomVal}
+              onChange={handleZoomChange}
+              className="flex-1 accent-primary h-1.5 rounded-lg appearance-none bg-white/20 cursor-pointer"
+            />
+            <ZoomIn className="w-4 h-4 text-white/60 shrink-0" />
+            <span className="text-[10px] font-mono text-white/80 shrink-0 w-6 text-right">
+              {zoomVal.toFixed(1)}x
+            </span>
+          </div>
         )}
 
         {/* Detected banner */}
