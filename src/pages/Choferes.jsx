@@ -1,17 +1,21 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Contact, Search, Plus, Pencil, X, Check, ToggleLeft, ToggleRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import Pagination from '@/components/ui/pagination'
 import { supabase } from '@/lib/supabase'
 import { normalizeText } from '@/lib/utils'
 import { toast } from 'sonner'
 
 export default function ChoferesPage() {
   const [choferes, setChoferes] = useState([])
-  const [filter, setFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const pageSize = 20
   const [editId, setEditId] = useState(null)
   const [editNombre, setEditNombre] = useState('')
   const [editApellido, setEditApellido] = useState('')
@@ -23,24 +27,30 @@ export default function ChoferesPage() {
   const [newApellido, setNewApellido] = useState('')
   const [newTelefono, setNewTelefono] = useState('')
 
-  useEffect(() => { load() }, [])
-
-  async function load() {
-    const { data, error } = await supabase
+  const load = useCallback(async () => {
+    let q = supabase
       .from('chofer')
-      .select('*')
-      .order('nombre')
-    
+      .select('*', { count: 'exact' })
+
+    if (search) {
+      q = q.or(`nombre.ilike.%${search}%,apellido.ilike.%${search}%,cedula.ilike.%${search}%`)
+    }
+
+    q = q.order('nombre')
+
+    const rangeStart = (page - 1) * pageSize
+    const { data, count, error } = await q.range(rangeStart, rangeStart + pageSize - 1)
     if (error) return toast.error('Error al cargar: ' + error.message)
     setChoferes(data || [])
-  }
+    setTotal(count || 0)
+  }, [page, search])
 
-  const filtered = choferes.filter(c =>
-    !filter || 
-    (c.nombre || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (c.apellido || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (c.cedula || '').toLowerCase().includes(filter.toLowerCase())
-  )
+  useEffect(() => { load() }, [load])
+
+  function handleSearchChange(value) {
+    setSearch(value)
+    setPage(1)
+  }
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -181,12 +191,12 @@ export default function ChoferesPage() {
       )}
 
       <div className="relative max-w-xs">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="Buscar por nombre, apellido o cédula..." value={filter} onChange={e => setFilter(e.target.value.toUpperCase())} className="pl-9" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <Input placeholder="Buscar por nombre, apellido o cédula..." value={search} onChange={e => handleSearchChange(e.target.value)} className="pl-9" />
       </div>
 
       <div className="space-y-2">
-        {filtered.map(c => (
+        {choferes.map(c => (
           <Card key={c.id} className={`p-4 transition-all ${!c.activo ? 'opacity-60 bg-secondary/30' : ''}`}>
             {editId === c.id ? (
               <div className="space-y-3">
@@ -253,8 +263,10 @@ export default function ChoferesPage() {
             )}
           </Card>
         ))}
-        {filtered.length === 0 && <p className="text-center text-muted-foreground py-8">No se encontraron choferes</p>}
+        {choferes.length === 0 && <p className="text-center text-muted-foreground py-8">No se encontraron choferes</p>}
       </div>
+
+      <Pagination page={page} totalPages={Math.ceil(total / pageSize)} onPageChange={setPage} />
     </div>
   )
 }
