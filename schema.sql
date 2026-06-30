@@ -79,6 +79,15 @@ create table public.institucion (
   nombre text not null unique,
   direccion text not null,
   parroquia_id bigint references public.parroquia(id) on delete restrict not null,
+  organizacion text,
+  telefono text,
+  horario text,
+  tipos_ayuda text,
+  notas text,
+  instagram text,
+  latitud double precision,
+  longitud double precision,
+  activo boolean default true,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
