@@ -360,6 +360,7 @@ export async function sendRecord(record) {
     producto_id: finalProductId,
     cantidad: Number(record.quantity) || 1,
     unidad: record.presentation || 'unidades',
+    peso_unitario: record.peso_unitario || null,
     institucion_origen_id: isTransferencia ? record.institucionOrigenId : (record.tipoMovimiento === 'Salida' ? record.institucionId : null),
     institucion_destino_id: isTransferencia ? record.institucionDestinoId : (record.tipoMovimiento === 'Entrada' ? record.institucionId : null),
     tipo_movimiento_id: tipoMovimientoId,
