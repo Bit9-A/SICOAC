@@ -536,9 +536,10 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
                   value={product}
                   onChange={handleProductChange}
                   onSearch={handleProductSearch}
+                  onQueryChange={setProduct}
                   searching={productSearching}
                   placeholder="Escribe el nombre del producto..."
-                  emptyMessage={product?.trim().length >= 2 ? 'Sin resultados' : 'Escribe al menos 2 caracteres'}
+                  emptyMessage={product?.trim().length >= 2 ? 'Sin resultados — puede escribir un nombre nuevo' : 'Escribe al menos 2 caracteres'}
                   showValueAsText
                 />
                 {errors.product && <p className="text-xs text-destructive">{errors.product}</p>}

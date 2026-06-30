@@ -17,6 +17,7 @@ export function SearchSelect({
   showValueAsText,// bool — si no hay option que matchee el value, muestra el value como texto
   error,          // bool — muestra borde rojo de error
   inputMode,      // string — inputMode override (ej: 'numeric' para barcode)
+  onQueryChange,  // (query: string) => void — se llama al escribir, útil para free-text
 }) {
   const [open, setOpen]           = useState(false)
   const [query, setQuery]         = useState('')
@@ -81,7 +82,8 @@ export function SearchSelect({
     setActiveIndex(0)
     if (!open) setOpen(true)
     onSearch?.(q)
-  }, [open, onSearch])
+    onQueryChange?.(q)
+  }, [open, onSearch, onQueryChange])
 
   const handleKeyDown = (e) => {
     if (!open) {
