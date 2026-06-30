@@ -14,6 +14,8 @@ import { supabase } from './supabase'
 export async function signUp({ username, password, nombre, apellido, telefono, cedula, rol, institucionId, disponibilidadDias, disponibilidadHoraDesde, disponibilidadHoraHasta }) {
 
   const email = `${username.toLowerCase().trim()}@acopio.app`
+  
+  // 1. Crear el usuario en Supabase Auth
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email,
     password,
@@ -32,11 +34,30 @@ export async function signUp({ username, password, nombre, apellido, telefono, c
       },
     },
   })
-  if (authError) {
-    throw authError
-  }
-
+  
+  if (authError) throw authError
   if (!authData.user) throw new Error('No se pudo crear el usuario')
+
+  // 2. SOLUCIÓN AL NULL: Insertar/Asegurar el registro directo en tu tabla pública 'usuarios'
+  // Si ya usas un Trigger en la Base de Datos, este .upsert() actualizará la cédula que faltaba sin duplicar.
+  const { error: dbError } = await supabase
+    .from('usuarios')
+    .upsert({
+      id: authData.user.id, // Vincula el ID de Auth con el ID de la tabla pública
+      username: username.toUpperCase().trim(),
+      nombre,
+      apellido,
+      cedula: cedula || null, // Guarda la cédula formateada (Ej: V-30609563)
+      telefono: telefono || null,
+      rol: rol || 'operador',
+      institucion_id: institucionId || null,
+      activo: true
+    }, { onConflict: 'username' }) // Evita errores de duplicados si el trigger ya actuó
+
+  if (dbError) {
+    console.error("Error al guardar en tabla pública usuarios:", dbError.message)
+    // Opcional: throw dbError si quieres que falle el registro completo si no se guarda el perfil
+  }
 
   return authData.user
 }

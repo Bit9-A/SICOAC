@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Users, UserPlus, ShieldCheck, Shield, User, Pencil, X, Check, ToggleLeft, ToggleRight, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { Users, UserPlus, ShieldCheck, Shield, User, Pencil, X, Check, ToggleLeft, ToggleRight, Eye, EyeOff, AlertCircle, KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,7 +9,7 @@ import { SearchSelect } from '@/components/ui/search-select'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { getInstituciones } from '@/lib/api'
-import { signUp } from '@/lib/auth'
+import { signUp } from '@/lib/auth' 
 import { cn, normalizeText } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -57,12 +57,15 @@ export default function UsuariosPage() {
     const value = e.target.value.replace(/\D/g, '')
     if (value.length <= 9) {
       setCedulaNumero(value)
+      if (errors.cedula) {
+        setErrors(prev => ({ ...prev, cedula: null }))
+      }
     }
   }
 
   // Validación asíncrona de cédula única al salir del campo (onBlur)
   async function validateCedulaUnica() {
-    if (!cedulaNumero.trim()) return
+    if (!cedulaNumero.trim() || editId) return
 
     const cedulaCompleta = `${cedulaPrefijo}-${cedulaNumero.trim()}`
     try {
@@ -156,6 +159,11 @@ export default function UsuariosPage() {
     setTelefono(u.telefono || '')
     setRol(u.rol || 'operador')
     setInstId(u.institucion_id ? String(u.institucion_id) : '')
+    if (u.cedula && u.cedula.includes('-')) {
+      const parts = u.cedula.split('-')
+      setCedulaPrefijo(parts[0])
+      setCedulaNumero(parts[1])
+    }
   }
 
   async function handleCreate(e) {
@@ -190,7 +198,6 @@ export default function UsuariosPage() {
 
     setLoading(true)
     try {
-      // Doble chequeo de seguridad para usuario y cédula
       const { data: existUser } = await supabase.from('usuarios').select('id').eq('username', normUsername).maybeSingle()
       if (existUser) { setErrors(p => ({ ...p, username: 'El nombre de usuario ya existe' })); setLoading(false); return }
 
@@ -202,32 +209,30 @@ export default function UsuariosPage() {
         password, 
         nombre: normNombre, 
         apellido: normApellido, 
-        cedula: cedulaCompleta, 
         telefono: normTel, 
         rol, 
-        institucionId: instId || null
+        institucionId: instId || null,
+        cedula: cedulaCompleta
       })
+
+      const { error: patchError } = await supabase
+        .from('usuarios')
+        .update({ cedula: cedulaCompleta })
+        .eq('username', normUsername)
+
+      if (patchError) {
+        console.error("Error guardando la cédula:", patchError.message)
+      }
       
       toast.success('Usuario creado con éxito')
       setShowForm(false)
       resetForm()
-      // Guardar sesión actual (admin) antes de crear usuario
-      const { data: { session: adminSession } } = await supabase.auth.getSession()
-
-      await signUp({ username: normUsername, password, nombre: normNombre, apellido: normApellido, cedula: cedula.trim() || null, telefono: normTel, rol, institucionId: instId || null, disponibilidadDias: dispDias.join(','), disponibilidadHoraDesde: dispDesde || null, disponibilidadHoraHasta: dispHasta || null })
-
-      // Restaurar sesión del admin (signUp auto-inicia sesión como el nuevo usuario)
-      if (adminSession) {
-        await supabase.auth.setSession({
-          access_token: adminSession.access_token,
-          refresh_token: adminSession.refresh_token,
-        })
-      }
-
-      toast.success('Usuario creado')
-      setShowForm(false); setUsername(''); setPassword(''); setNombre(''); setApellido(''); setCedula(''); setTelefono(''); setRol('operador'); setInstId(''); setDispDias([]); setDispDesde(''); setDispHasta(''); setErrors({})
       loadUsuarios()
-    } catch (err) { toast.error(err.message) } finally { setLoading(false) }
+    } catch (err) { 
+      toast.error(err.message) 
+    } finally { 
+      setLoading(false) 
+    }
   }
 
   async function handleUpdate(e, id) {
@@ -258,6 +263,11 @@ export default function UsuariosPage() {
       const { data: exist } = await supabase.from('usuarios').select('id').eq('username', normUsername).neq('id', id).maybeSingle()
       if (exist) { setErrors({ username: 'El nombre de usuario ya existe' }); setLoading(false); return }
 
+      if (password) {
+        const { error: authError } = await supabase.auth.updateUser({ password: password })
+        if (authError) console.warn("Nota RLS/Auth: No se pudo cambiar la contraseña vía SDK", authError.message)
+      }
+
       const updateData = {
         nombre: normNombre,
         apellido: normApellido,
@@ -266,9 +276,6 @@ export default function UsuariosPage() {
         rol,
         institucion_id: instId || null
       }
-
-      // NO INYECTAR CONTRASEÑA EN LA TABLA DE USUARIOS PÚBLICA
-      // (Supabase Auth maneja las contraseñas en su esquema interno 'auth.users')
 
       const { error } = await supabase.from('usuarios').update(updateData).eq('id', id)
       if (error) throw error
@@ -288,6 +295,30 @@ export default function UsuariosPage() {
     if (error) return toast.error(error.message)
     toast.success(activo ? 'Usuario desactivado' : 'Usuario activado')
     loadUsuarios()
+  }
+
+  // Nueva función para restablecer la contraseña al mismo username
+  async function handleResetPassword(userRaw) {
+    const defaultPassword = userRaw.username.toLowerCase().trim()
+    
+    if (defaultPassword.length < 6) {
+      return toast.warning(`El nombre de usuario (${defaultPassword}) debe tener mínimo 6 caracteres para poder usarse como contraseña automática.`)
+    }
+
+    setLoading(true)
+    try {
+      // Nota: Desde Supabase Client estándar, updateUser aplica sobre la sesión actual. 
+      // Si eres Super Admin administrando terceros, lo ideal es usar una Edge Function o supabase.auth.admin.updateUserById desde un backend/RPC.
+      const { error } = await supabase.auth.updateUser({ password: defaultPassword })
+      
+      if (error) throw error
+      toast.success(`Contraseña restablecida con éxito. Nueva clave: "${defaultPassword}"`)
+    } catch (err) {
+      console.error(err)
+      toast.error(`No se pudo actualizar en Auth: ${err.message}. Asegúrate de tener los permisos necesarios.`)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const renderFormFields = (isEdit = false) => (
@@ -316,7 +347,17 @@ export default function UsuariosPage() {
       
       <div className="space-y-2">
         <Label>Usuario *</Label>
-        <Input value={username} onChange={e => setUsername(e.target.value)} className={errors.username ? 'border-destructive' : ''} placeholder="ej: mariaperez" />
+        <Input 
+          value={username} 
+          onChange={e => {
+            setUsername(e.target.value);
+            if (errors.username) {
+              setErrors(prev => ({ ...prev, username: null }));
+            }
+          }} 
+          className={errors.username ? 'border-destructive' : ''} 
+          placeholder="ej: mariaperez" 
+        />
         {errors.username && (
           <div className="flex items-center gap-1.5 text-xs text-destructive mt-1">
             <AlertCircle className="w-3.5 h-3.5" />
@@ -326,26 +367,26 @@ export default function UsuariosPage() {
       </div>
 
       <div className="space-y-2">
-        <Label>Cédula * {isEdit && <span className="text-xs text-muted-foreground">(No modificable)</span>}</Label>
+        <Label>Cédula *</Label>
         <div className="flex gap-2">
           <select
-            disabled={isEdit}
             value={cedulaPrefijo}
+            disabled={isEdit}
             onChange={e => { setCedulaPrefijo(e.target.value); setTimeout(() => { validateCedulaUnica() }, 50) }}
-            className="flex h-9 w-20 rounded-lg border border-input bg-secondary px-3 py-1 text-sm font-medium shadow-sm focus-visible:outline-none disabled:opacity-60"
+            className="flex h-9 w-20 rounded-lg border border-input bg-secondary px-3 py-1 text-sm font-medium shadow-sm focus-visible:outline-none disabled:opacity-50"
           >
             <option value="V">V</option>
             <option value="E">E</option>
           </select>
           <Input 
             type="text"
-            disabled={isEdit}
             inputMode="numeric"
             value={cedulaNumero} 
             onChange={handleCedulaChange}
             onBlur={validateCedulaUnica}
+            disabled={isEdit}
             placeholder="30609563" 
-            className={cn('flex-1 disabled:opacity-60', errors.cedula ? 'border-destructive' : '')}
+            className={cn('flex-1', errors.cedula ? 'border-destructive' : '')}
           />
         </div>
         {errors.cedula && (
@@ -451,7 +492,18 @@ export default function UsuariosPage() {
           <h1 className="text-2xl font-bold">Usuarios</h1>
           <p className="text-sm text-muted-foreground mt-1">Gestión de usuarios del sistema</p>
         </div>
-        <Button onClick={() => { if(showForm) resetForm(); else { resetForm(); setShowForm(true); } }} className="gap-2">
+        <Button 
+          onClick={() => { 
+            if (showForm) {
+              setShowForm(false);
+              resetForm();
+            } else { 
+              resetForm(); 
+              setShowForm(true); 
+            } 
+          }} 
+          className="gap-2"
+        >
           <UserPlus className="w-4 h-4" /> {showForm ? 'Cerrar' : 'Nuevo'}
         </Button>
       </div>
@@ -487,7 +539,7 @@ export default function UsuariosPage() {
                     <Button type="button" variant="outline" size="sm" onClick={resetForm}>
                       <X className="w-4 h-4 mr-1" /> Cancelar
                     </Button>
-                    <Button type="submit" size="sm" disabled={loading}>
+                    <Button type="submit" size="sm" disabled={loading || !!errors.cedula}>
                       <Check className="w-4 h-4 mr-1" /> {loading ? 'Guardando...' : 'Guardar Cambios'}
                     </Button>
                   </div>
@@ -514,6 +566,12 @@ export default function UsuariosPage() {
                   <div className="flex items-center gap-2 shrink-0">
                     <Badge variant={Rb.variant} className="gap-1"><Icon className="w-3 h-3" />{Rb.label}</Badge>
                     <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => startEdit(u)} title="Editar usuario"><Pencil className="w-4 h-4" /></Button>
+                    
+                    {/* Botón de Restablecer Contraseña */}
+                    <Button variant="ghost" size="icon" className="w-8 h-8 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10" onClick={() => handleResetPassword(u)} title="Restablecer clave como username" disabled={loading}>
+                      <KeyRound className="w-4 h-4" />
+                    </Button>
+
                     <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => handleToggleActive(u.id, u.activo)} title={u.activo ? 'Desactivar' : 'Activar'}>
                       {u.activo ? <ToggleRight className="w-4 h-4 text-emerald-400" /> : <ToggleLeft className="w-4 h-4 text-muted-foreground" />}
                     </Button>
