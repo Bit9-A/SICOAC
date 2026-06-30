@@ -442,8 +442,8 @@ export default function DespachosPage() {
       
       {/* MODAL DE CONFIRMACIÓN DE ENTREGA */}
       {showDeliveryModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in no-print">
-          <Card className="p-6 max-w-md w-full space-y-4 shadow-xl border border-emerald-100">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in no-print">
+          <Card className="p-6 max-w-md w-full space-y-4 shadow-xl border border-emerald-100 scale-95 animate-in fade-in-0 zoom-in-95 duration-200">
             <div className="flex items-center gap-3 text-emerald-600">
               <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
                 <CheckCircle className="w-6 h-6" />
@@ -467,8 +467,8 @@ export default function DespachosPage() {
 
       {/* MODAL DE CONFIRMACIÓN DE CANCELACIÓN */}
       {showCancelModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in no-print">
-          <Card className="p-6 max-w-md w-full space-y-4 shadow-xl border border-destructive/10">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in no-print">
+          <Card className="p-6 max-w-md w-full space-y-4 shadow-xl border border-destructive/10 scale-95 animate-in fade-in-0 zoom-in-95 duration-200">
             <div className="flex items-center gap-3 text-destructive">
               <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
                 <AlertTriangle className="w-6 h-6" />
@@ -578,6 +578,14 @@ export default function DespachosPage() {
                   <p className="text-xs text-muted-foreground mt-0.5">
                     <span className="font-medium text-slate-800">{d.origen?.nombre || 'Donación'}</span> → <span className="font-medium text-slate-800">{d.destino?.nombre}</span>
                   </p>
+                  <div className="flex flex-wrap gap-x-2 gap-y-1 mt-1 text-[11px] text-slate-500 md:hidden font-medium">
+                    <span className="bg-slate-100/80 px-1.5 py-0.5 rounded text-slate-600">
+                      🚚 {d.chofer ? `${d.chofer.nombre} ${d.chofer.apellido}` : 'Sin chofer'}
+                    </span>
+                    <span className="bg-slate-100/80 px-1.5 py-0.5 rounded text-slate-600 font-mono uppercase">
+                      Placa: {d.vehiculo ? d.vehiculo.placa : 'N/A'}
+                    </span>
+                  </div>
                 </div>
                 <div className="text-right text-xs text-muted-foreground hidden md:block shrink-0 px-4">
                   <p className="font-medium text-slate-600">{d.chofer ? `${d.chofer.nombre} ${d.chofer.apellido}` : 'Sin chofer'}</p>
@@ -672,20 +680,56 @@ export default function DespachosPage() {
             ) : (
               <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                 {cart.map((item) => (
-                  <div key={item.id} className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-sm">
-                    <Package className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span className="flex-1 text-sm font-medium text-slate-800 truncate">{item.nombre}</span>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Badge variant="outline" className="text-[10px] font-normal text-emerald-600 border-emerald-200 bg-emerald-50 whitespace-nowrap">
-                        Stock: {item.maxStock}
-                      </Badge>
-                      <Input type="number" value={item.cantidad} onChange={e => updateCant(item.id, e.target.value)} onBlur={() => handleCantBlur(item.id)}
-                        className="w-20 h-8 text-sm text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
-                      <Badge variant="secondary" className="text-xs font-normal">{item.unidad}</Badge>
+                  <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border bg-card p-3 shadow-sm hover:border-slate-300 transition-colors">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="p-2 bg-slate-100 rounded-lg shrink-0">
+                        <Package className="w-4 h-4 text-slate-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{item.nombre}</p>
+                        <span className="inline-flex items-center text-[10px] text-emerald-600 font-medium mt-0.5">
+                          Disponible: {item.maxStock} {item.unidad}
+                        </span>
+                      </div>
                     </div>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeFromCart(item.id)} className="w-8 h-8 text-destructive hover:text-destructive hover:bg-destructive/10">
-                      <X className="w-4 h-4" />
-                    </Button>
+                    
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center border rounded-lg bg-background shadow-sm overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => updateCant(item.id, Math.max(1, Number(item.cantidad) - 1))}
+                            className="px-2.5 py-1 hover:bg-slate-100 text-slate-500 transition-colors border-r text-sm font-semibold select-none"
+                          >
+                            -
+                          </button>
+                          <Input
+                            type="number"
+                            value={item.cantidad}
+                            onChange={e => updateCant(item.id, e.target.value)}
+                            onBlur={() => handleCantBlur(item.id)}
+                            className="w-12 h-8 border-0 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus-visible:ring-0 focus-visible:ring-offset-0 font-semibold text-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => updateCant(item.id, Math.min(item.maxStock, Number(item.cantidad) + 1))}
+                            className="px-2.5 py-1 hover:bg-slate-100 text-slate-500 transition-colors border-l text-sm font-semibold select-none"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <Badge variant="secondary" className="text-xs font-normal h-8 flex items-center px-2">{item.unidad}</Badge>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeFromCart(item.id)}
+                        className="w-8 h-8 rounded-lg text-destructive hover:text-white hover:bg-destructive transition-colors shrink-0"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -765,13 +809,13 @@ export default function DespachosPage() {
               </div>
             )}
 
-            <div className="flex justify-between items-start border-b-2 border-slate-300 pb-5">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 border-b-2 border-slate-300 pb-5">
               <div className="space-y-1">
                 <h2 className="text-2xl font-bold uppercase tracking-tight text-slate-900">Guía de Despacho Logístico</h2>
                 <p className="text-xs text-slate-500 uppercase font-semibold">Sistema Unificado de Control de Acopio (SICOAC)</p>
                 <p className="text-xs text-slate-400">Asistencia y Suministros Humanitarios de Emergencia</p>
               </div>
-              <div className="text-right bg-slate-50 border p-3 rounded-lg">
+              <div className="text-left sm:text-right bg-slate-50 border p-3 rounded-lg w-full sm:w-auto">
                 <p className="text-xs text-slate-500 font-bold uppercase">NÚMERO DE GUÍA</p>
                 <p className="text-base font-mono font-bold text-primary mt-0.5">{guia.numero_guia}</p>
                 <p className="text-[10px] text-slate-400 mt-1">{new Date(guia.created_at).toLocaleDateString('es-VE')} — {new Date(guia.created_at).toLocaleTimeString('es-VE', {hour: '2-digit', minute:'2-digit'})}</p>
@@ -812,26 +856,28 @@ export default function DespachosPage() {
 
             <div className="space-y-2">
               <p className="text-xs font-bold uppercase text-slate-500 tracking-wider">Manifiesto del Cargamento Despachado</p>
-              <table className="w-full text-xs border-collapse text-left">
-                <thead>
-                  <tr className="bg-slate-900 text-white uppercase text-[10px] tracking-wider">
-                    <th className="py-2.5 px-3 rounded-l-md">Item</th>
-                    <th className="py-2.5 px-3">Descripción de Insumo</th>
-                    <th className="py-2.5 px-3 text-right">Cantidad</th>
-                    <th className="py-2.5 px-3 text-right rounded-r-md">Unidad Medida</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y border-b">
-                  {(guia.items || []).map((m, i) => (
-                    <tr key={m.id} className={`font-medium ${guia.estado_entrega === 'Cancelado' ? 'text-slate-400 line-through decoration-red-500' : 'text-slate-800'}`}>
-                      <td className="py-2.5 px-3 text-slate-400">{i + 1}</td>
-                      <td className="py-2.5 px-3 text-sm">{m.producto?.nombre}</td>
-                      <td className="py-2.5 px-3 text-right font-bold text-base text-slate-900">{Number(m.cantidad).toFixed(0)}</td>
-                      <td className="py-2.5 px-3 text-right text-slate-500 font-normal">{m.unidad}</td>
+              <div className="overflow-x-auto w-full border rounded-lg shadow-sm">
+                <table className="w-full text-xs border-collapse text-left">
+                  <thead>
+                    <tr className="bg-slate-900 text-white uppercase text-[10px] tracking-wider">
+                      <th className="py-2.5 px-3">Item</th>
+                      <th className="py-2.5 px-3">Descripción de Insumo</th>
+                      <th className="py-2.5 px-3 text-right">Cantidad</th>
+                      <th className="py-2.5 px-3 text-right">Unidad Medida</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y border-b bg-white">
+                    {(guia.items || []).map((m, i) => (
+                      <tr key={m.id} className={`font-medium ${guia.estado_entrega === 'Cancelado' ? 'text-slate-400 line-through decoration-red-500' : 'text-slate-800'}`}>
+                        <td className="py-2.5 px-3 text-slate-400">{i + 1}</td>
+                        <td className="py-2.5 px-3 text-sm">{m.producto?.nombre}</td>
+                        <td className="py-2.5 px-3 text-right font-bold text-base text-slate-900">{Number(m.cantidad).toFixed(0)}</td>
+                        <td className="py-2.5 px-3 text-right text-slate-500 font-normal">{m.unidad}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-12 pt-16 text-xs text-center">
