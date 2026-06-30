@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import {
-  LayoutDashboard, Package, ClipboardList, Users, Building2, Settings, LogOut,
+  LayoutDashboard, Package, ClipboardList, Users, Building2, Settings, LogOut, Key,
   ScanLine, ChevronLeft, Menu, ShoppingBag, Tags, QrCode, Truck, HeartHandshake, Contact, Car, ChevronUp
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { updatePassword } from '@/lib/auth'
+import { toast } from 'sonner'
 
 const NAV_ITEMS = {
   super_admin: [
@@ -39,6 +41,10 @@ export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpen
   const collapsedRef = useRef(collapsed)
   const touchStartRef = useRef(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
   const items = NAV_ITEMS[rol] || NAV_ITEMS.admin
 
   const initials = profile ? (profile.nombre?.[0] || '') + (profile.apellido?.[0] || '') : '?'
@@ -82,6 +88,25 @@ export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpen
   function handleLogoutClick() {
     setShowUserMenu(false)
     onLogout()
+  }
+
+  async function handleChangePassword() {
+    if (!newPassword) return toast.error('Ingresa una nueva contraseña')
+    if (newPassword.length < 6) return toast.error('La contraseña debe tener al menos 6 caracteres')
+    if (newPassword !== confirmPassword) return toast.error('Las contraseñas no coinciden')
+
+    setChangingPassword(true)
+    try {
+      await updatePassword(newPassword)
+      toast.success('Contraseña actualizada correctamente')
+      setShowPasswordModal(false)
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (err) {
+      toast.error(err.message || 'Error al cambiar la contraseña')
+    } finally {
+      setChangingPassword(false)
+    }
   }
 
   return (
@@ -172,6 +197,13 @@ export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpen
               <div className="px-4 pb-3 space-y-2">
                 <p className="text-xs text-muted-foreground capitalize">{profile.rol?.replace('_', ' ')}</p>
                 <button
+                  onClick={() => { setShowPasswordModal(true); setShowUserMenu(false) }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-secondary transition-colors"
+                >
+                  <Key className="w-4 h-4" />
+                  Cambiar contraseña
+                </button>
+                <button
                   onClick={handleLogoutClick}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors"
                 >
@@ -184,6 +216,37 @@ export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpen
         )}
 
       </aside>
+
+      {/* Password change modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4" onClick={() => { setShowPasswordModal(false); setNewPassword(''); setConfirmPassword('') }}>
+          <div className="bg-card rounded-xl p-6 w-full max-w-sm mx-auto shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="font-semibold text-lg">Cambiar contraseña</h3>
+            <div className="space-y-3 mt-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Nueva contraseña</label>
+                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm" placeholder="Mínimo 6 caracteres" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Confirmar contraseña</label>
+                <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+                  className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm" placeholder="Repite la contraseña" />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => { setShowPasswordModal(false); setNewPassword(''); setConfirmPassword('') }}
+                className="flex-1 px-4 py-2 rounded-lg text-sm font-medium border border-input hover:bg-secondary transition-colors">
+                Cancelar
+              </button>
+              <button onClick={handleChangePassword} disabled={changingPassword}
+                className="flex-1 px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50">
+                {changingPassword ? 'Cambiando...' : 'Cambiar contraseña'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile hamburger */}
       {collapsed && (
