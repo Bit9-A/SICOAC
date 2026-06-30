@@ -468,7 +468,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="quantity">Cantidad <span className="text-destructive">*</span></Label>
+                <Label htmlFor="quantity">Cantidad por bulto/caja <span className="text-destructive">*</span></Label>
                 <Input
                   id="quantity"
                   ref={quantityRef}

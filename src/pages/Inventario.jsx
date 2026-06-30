@@ -104,6 +104,11 @@ export default function InventarioPage() {
                 <div className="text-right shrink-0">
                   <p className="text-xl font-bold tabular-nums">{cantidad.toFixed(0)}</p>
                   <p className="text-xs text-muted-foreground">{item.producto?.presentacion || 'unidades'}</p>
+                  {item.peso_unitario && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {(cantidad * Number(item.peso_unitario)).toFixed(2)} kg total
+                    </p>
+                  )}
                 </div>
                 {cantidad <= umbral && (
                   <Badge variant="warning" className="gap-1 shrink-0">
