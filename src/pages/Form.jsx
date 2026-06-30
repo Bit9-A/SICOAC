@@ -201,7 +201,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     return { value: 'new', label: name }
   }
 
-  const handleCreateCategory = async (name) => ({ value: name, label: name })
+  const handleCreateCategory = async (name) => ({ value: name.toUpperCase(), label: name.toUpperCase() })
 
   function validateStep1() {
     const e = {}
@@ -508,21 +508,22 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
                 <h3 className="font-semibold">3. Producto</h3>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="barcode">Código de barras</Label>
-                <div className="flex gap-2">
-                  <SearchSelect
-                    id="barcode"
-                    options={barcodeOptions}
-                    value={barcode}
-                    onChange={handleBarcodeChange}
-                    onSearch={handleBarcodeSearch}
-                    searching={barcodeSearching}
-                    placeholder="Escanear o escribir..."
-                    emptyMessage={barcode?.trim().length >= 2 ? 'Sin resultados — puedes escribir un código nuevo' : 'Escribe al menos 2 dígitos'}
-                    showValueAsText
-                    className="flex-1"
-                  />
+                <div className="space-y-2">
+                  <Label htmlFor="barcode">Código de barras</Label>
+                  <div className="flex gap-2">
+                    <SearchSelect
+                      id="barcode"
+                      options={barcodeOptions}
+                      value={barcode}
+                      onChange={handleBarcodeChange}
+                      onSearch={handleBarcodeSearch}
+                      searching={barcodeSearching}
+                      placeholder="Escanear o escribir..."
+                      emptyMessage={barcode?.trim().length >= 2 ? 'Sin resultados — puedes escribir un código nuevo' : 'Escribe al menos 2 dígitos'}
+                      showValueAsText
+                      className="flex-1"
+                      inputMode="numeric"
+                    />
                   {!initialBarcode && <Button type="button" variant="outline" size="icon" onClick={onScanAgain}><ScanLine className="w-4 h-4" /></Button>}
                 </div>
               </div>
@@ -535,9 +536,10 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
                   value={product}
                   onChange={handleProductChange}
                   onSearch={handleProductSearch}
+                  onQueryChange={v => setProduct(v.toUpperCase())}
                   searching={productSearching}
                   placeholder="Escribe el nombre del producto..."
-                  emptyMessage={product?.trim().length >= 2 ? 'Sin resultados' : 'Escribe al menos 2 caracteres'}
+                  emptyMessage={product?.trim().length >= 2 ? 'Sin resultados — puede escribir un nombre nuevo' : 'Escribe al menos 2 caracteres'}
                   showValueAsText
                 />
                 {errors.product && <p className="text-xs text-destructive">{errors.product}</p>}

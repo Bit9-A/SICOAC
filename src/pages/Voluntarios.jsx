@@ -20,6 +20,8 @@ export default function VoluntariosPage() {
   const [filtroInst, setFiltroInst] = useState('')
   const [filtroDia, setFiltroDia] = useState('')
 
+  const tieneInstitucion = !!institucionId
+
   const DIAS = [
     { key: 'L', label: 'Lun' }, { key: 'M', label: 'Mar' }, { key: 'MI', label: 'Mie' },
     { key: 'J', label: 'Jue' }, { key: 'V', label: 'Vie' }, { key: 'S', label: 'Sab' },
@@ -29,7 +31,7 @@ export default function VoluntariosPage() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const [vols, insts] = await Promise.all([getVoluntarios(), getInstituciones()])
+    const [vols, insts] = await Promise.all([getVoluntarios(institucionId), getInstituciones()])
     setVoluntarios(vols)
     setInstituciones(insts)
   }
@@ -84,13 +86,15 @@ export default function VoluntariosPage() {
             <Label className="text-xs">Buscar</Label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input value={search} onChange={e => setSearch(e.target.value.toUpperCase())} placeholder="Nombre, cédula o email..." className="pl-9" />
+              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre, cédula o email..." className="pl-9" />
             </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Institución</Label>
-            <SearchSelect options={instituciones} value={filtroInst} onChange={setFiltroInst} placeholder="Todas" />
-          </div>
+          {!tieneInstitucion && (
+            <div className="space-y-1">
+              <Label className="text-xs">Institución</Label>
+              <SearchSelect options={instituciones} value={filtroInst} onChange={setFiltroInst} placeholder="Todas" />
+            </div>
+          )}
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Disponibilidad por día</Label>
