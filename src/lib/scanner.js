@@ -43,6 +43,41 @@ export function stopCamera() {
   }
 }
 
+export function getCameraCapabilities() {
+  if (!stream) return null
+  const track = stream.getVideoTracks()[0]
+  if (!track) return null
+  return {
+    capabilities: typeof track.getCapabilities === 'function' ? track.getCapabilities() : {},
+    settings: typeof track.getSettings === 'function' ? track.getSettings() : {}
+  }
+}
+
+export async function applyCameraSettings({ torch, zoom }) {
+  if (!stream) return
+  const track = stream.getVideoTracks()[0]
+  if (!track) return
+  
+  const capabilities = typeof track.getCapabilities === 'function' ? track.getCapabilities() : {}
+  const advanced = {}
+  
+  if (capabilities.torch && torch !== undefined) {
+    advanced.torch = torch
+  }
+  if (capabilities.zoom && zoom !== undefined) {
+    const min = capabilities.zoom.min || 1
+    const max = capabilities.zoom.max || 1
+    advanced.zoom = Math.max(min, Math.min(max, zoom))
+  }
+  
+  if (Object.keys(advanced).length > 0) {
+    await track.applyConstraints({
+      advanced: [advanced]
+    })
+  }
+}
+
+
 export async function startDetection(videoElement, onDetected) {
   if (!initDetector()) throw new Error('BarcodeDetector no disponible en este navegador.')
   scanning = true

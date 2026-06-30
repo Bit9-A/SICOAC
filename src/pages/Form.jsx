@@ -243,6 +243,8 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     if (!quantity || quantity.trim() === '' || isNaN(qty) || qty <= 0) newErrors.quantity = 'Ingresa una cantidad positiva'
 
     const isTransfer = tipoMovimiento === 'Transferencia'
+    const isSalida = tipoMovimiento === 'Salida'
+
     if (isTransfer) {
       if (!institucionOrigenId) newErrors.institucionOrigenId = 'Selecciona el origen'
       if (!institucionDestinoId) newErrors.institucionDestinoId = 'Selecciona el destino'
@@ -254,6 +256,35 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     }
 
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); toast.warning('Corrige los campos marcados'); return }
+
+    // Validar stock antes de salida/transferencia
+    if ((isSalida || isTransfer) && !isNaN(qty) && qty > 0) {
+      const instId = isTransfer ? institucionOrigenId : institucionId
+      if (instId && barcodeOptions.length > 0) {
+        // Buscar el productoId desde barcodeOptions o productOptions
+        let prodId = null
+        const barcFound = barcodeOptions.find(o => o.value === barcode)
+        if (barcFound) prodId = barcFound.productId
+        if (!prodId) {
+          const prodFound = productOptions.find(o => o.value === product)
+          if (prodFound) prodId = prodFound.productId
+        }
+        if (prodId) {
+          const { data: stockData } = await supabase
+            .from('inventario')
+            .select('cantidad')
+            .eq('producto_id', prodId)
+            .eq('institucion_id', instId)
+            .maybeSingle()
+          const disponible = Number(stockData?.cantidad || 0)
+          if (qty > disponible) {
+            setErrors({ quantity: `Stock insuficiente: disponible ${disponible}, requerido ${qty}` })
+            toast.error(`Stock insuficiente: solo hay ${disponible} unidades disponibles`)
+            return
+          }
+        }
+      }
+    }
 
     setErrors({})
     setSaving(true)

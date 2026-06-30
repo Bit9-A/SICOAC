@@ -24,6 +24,7 @@ export default function Login({ onLogin, defaultInstitucionId }) {
   const [nombre, setNombre] = useState('')
   const [apellido, setApellido] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [cedula, setCedula] = useState('')
   const [dispDias, setDispDias] = useState([])
   const [dispDesde, setDispDesde] = useState('')
   const [dispHasta, setDispHasta] = useState('')
@@ -36,8 +37,26 @@ export default function Login({ onLogin, defaultInstitucionId }) {
     { key: 'D', label: 'Dom' },
   ]
 
+  const HORAS = Array.from({ length: 33 }, (_, i) => {
+    const h = Math.floor(i / 2) + 6
+    const m = i % 2 === 0 ? '00' : '30'
+    return `${String(h).padStart(2, '0')}:${m}`
+  })
+
   function toggleDia(key) {
     setDispDias(prev => prev.includes(key) ? prev.filter(d => d !== key) : [...prev, key])
+  }
+
+  function formatPhone(value) {
+    const digits = value.replace(/\D/g, '')
+    if (!digits) return ''
+    let n = digits
+    if (n.startsWith('58') && n.length > 2) n = n.slice(2)
+    else if (n.startsWith('0')) n = n.slice(1)
+    const operador = n.slice(0, 3)
+    const numero = n.slice(3, 10)
+    if (numero) return `${operador}-${numero}`
+    return operador
   }
 
   // El ID de institución a usar (viene de QR o prop)
@@ -110,14 +129,20 @@ export default function Login({ onLogin, defaultInstitucionId }) {
 
     setLoading(true)
     try {
-      // Dynamic import para no cargar signUp siempre
       const { signUp } = await import('@/lib/auth')
       const instId = effectiveInstId || null
+      const normUsername = username.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+      // Verificar username único
+      const { data: exist } = await supabase.from('usuarios').select('id').eq('username', normUsername).maybeSingle()
+      if (exist) { setError('El nombre de usuario ya está registrado'); setLoading(false); return }
+
       await signUp({
-        username: username.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
+        username: normUsername,
         password,
         nombre: normalizeText(nombre),
         apellido: normalizeText(apellido),
+        cedula: cedula.trim() || null,
         telefono: telefono.trim(),
         rol: 'operador',
         institucionId: instId,
@@ -231,6 +256,10 @@ export default function Login({ onLogin, defaultInstitucionId }) {
                   <p className="text-xs text-muted-foreground">Se registrará como Operador</p>
                 </div>
               )}
+              <div className="space-y-2">
+                <Label htmlFor="reg-cedula">Cédula</Label>
+                <Input id="reg-cedula" value={cedula} onChange={e => setCedula(e.target.value.toUpperCase())} placeholder="V-12345678" />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="reg-nombre">Nombre <span className="text-destructive">*</span></Label>
@@ -243,7 +272,7 @@ export default function Login({ onLogin, defaultInstitucionId }) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="reg-tel">Teléfono</Label>
-                <Input id="reg-tel" type="tel" placeholder="0412-1234567" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+                <Input id="reg-tel" type="tel" placeholder="412-7445102" value={telefono} onChange={e => setTelefono(formatPhone(e.target.value))} />
               </div>
 
               {/* Disponibilidad */}
@@ -273,11 +302,19 @@ export default function Login({ onLogin, defaultInstitucionId }) {
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   <div>
                     <Label className="text-xs">Desde</Label>
-                    <Input type="time" value={dispDesde} onChange={e => setDispDesde(e.target.value)} className="h-9" />
+                    <select value={dispDesde} onChange={e => setDispDesde(e.target.value)}
+                      className="flex h-9 w-full rounded-lg border border-input bg-secondary px-3 text-sm">
+                      <option value="">—</option>
+                      {HORAS.filter(h => !dispHasta || h < dispHasta).map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
                   </div>
                   <div>
                     <Label className="text-xs">Hasta</Label>
-                    <Input type="time" value={dispHasta} onChange={e => setDispHasta(e.target.value)} className="h-9" />
+                    <select value={dispHasta} onChange={e => setDispHasta(e.target.value)}
+                      className="flex h-9 w-full rounded-lg border border-input bg-secondary px-3 text-sm">
+                      <option value="">—</option>
+                      {HORAS.filter(h => !dispDesde || h > dispDesde).map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
                   </div>
                 </div>
               </div>
