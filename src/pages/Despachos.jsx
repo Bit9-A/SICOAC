@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   Truck, Plus, Search, X, Printer, Eye, Package, Building2, PlusCircle,
-  FileText, Contact, Hash, CheckCircle, XCircle, AlertTriangle, ArrowUpRight, ArrowDownLeft
+  FileText, Contact, Hash, CheckCircle, XCircle, AlertTriangle, ArrowUpRight, ArrowDownLeft, Download
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,9 @@ import { useAuth } from '@/context/AuthContext'
 import { normalizeText } from '@/lib/utils'
 import { toast } from 'sonner'
 
+// Importamos la librería para conversión a PDF
+import html2pdf from 'html2pdf.js'
+
 export default function DespachosPage() {
   const { institucionId, isSuperAdmin, user, userProfile } = useAuth()
   const printRef = useRef(null)
@@ -27,9 +30,7 @@ export default function DespachosPage() {
   
   const [view, setView] = useState('list') 
   const [guia, setGuia] = useState(null)
-  
-  // Control de pestañas para el listado logístico
-  const [activeTab, setActiveTab] = useState('salidas') // 'salidas' o 'entradas'
+  const [activeTab, setActiveTab] = useState('salidas') 
 
   // Modales personalizados de confirmación
   const [showDeliveryModal, setShowDeliveryModal] = useState(false)
@@ -49,7 +50,6 @@ export default function DespachosPage() {
   const [loading, setLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
 
-  // Recargar el listado cada vez que el usuario cambia de pestaña de control
   useEffect(() => { 
     if (view === 'list') fetchDespachos() 
   }, [activeTab, origenId])
@@ -83,7 +83,6 @@ export default function DespachosPage() {
       `)
       .order('created_at', { ascending: false })
 
-    // Filtrado por rol e pestaña operativa
     if (!isSuperAdmin && institucionId) {
       if (activeTab === 'salidas') {
         q = q.eq('institucion_origen_id', institucionId)
@@ -376,6 +375,27 @@ export default function DespachosPage() {
     }
   }
 
+  // LOGICA PARA EXPORTAR EL ELEMENTO HTML A UN PDF DIGITAL PERFECTO
+  function handleDownloadPDF() {
+    const elemento = printRef.current;
+    const opciones = {
+      margin:       [10, 10, 10, 10], // Margen de seguridad estándar
+      filename:     `Guia_Despacho_${guia.numero_guia}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, logging: false }, // Duplica la escala para alta definición
+      jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' } // Formato Carta Oficial
+    };
+
+    toast.promise(
+      html2pdf().set(opciones).from(elemento).save(),
+      {
+        loading: 'Cargando hoja de Ruta...',
+        success: '¡Formato PDF generado y descargado con éxito!',
+        error: 'Fallo al estructurar el PDF digital.'
+      }
+    );
+  }
+
   function removeFromCart(id) {
     setCart(cart.filter(item => item.id !== id))
   }
@@ -461,7 +481,6 @@ export default function DespachosPage() {
       {/* LIST VIEW */}
       {view === 'list' && (
         <div className="space-y-4 no-print">
-          
           {!isSuperAdmin && (
             <div className="flex border-b border-slate-200 gap-2">
               <button
@@ -510,7 +529,6 @@ export default function DespachosPage() {
                       {d.estado_entrega}
                     </Badge>
                     
-                    {/* INDICADOR DE DIRECCIÓN CORREGIDO PARA RUTAS CANCELADAS */}
                     {!isSuperAdmin && (
                       <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${
                         d.estado_entrega === 'Cancelado' 
@@ -643,11 +661,10 @@ export default function DespachosPage() {
         </form>
       )}
 
-      {/* DOCUMENTO OFICIAL IMPRIMIBLE */}
+      {/* DOCUMENTO OFICIAL MANIFIESTO */}
       {view === 'guide' && guia && (
         <div className="space-y-4">
           
-          {/* CONTROL DE INTERFAZ OPERATIVA */}
           {guia.estado_entrega === 'En Ruta' && (
             <div className="no-print flex flex-col items-center justify-center gap-2 p-4 bg-secondary/40 border rounded-xl max-w-4xl mx-auto">
               <div className="flex justify-center gap-3 flex-wrap">
@@ -671,13 +688,13 @@ export default function DespachosPage() {
               )}
               {!isSuperAdmin && esInstitucionReceptora && (
                 <p className="text-[11px] text-emerald-700 font-medium mt-1">
-                  * Este cargamento viene asignado a tu almacén. Valida físicamente las unidades antes de presionar Confirmar Recepcion.
+                  * Este cargamento viene asignado a tu almacén. Valida físicamente las unidades antes de presionar confirmar de llegada.
                 </p>
               )}
             </div>
           )}
 
-          {/* VISTA CONTROLADA PARA DESPACHOS CANCELADOS (BLOQUEA IMPRESIÓN ORDINARIA) */}
+          {/* MENSAJE TÉCNICO DE BLOQUEO SI LA COMPRA/RUTA FUE ANULADA */}
           {guia.estado_entrega === 'Cancelado' ? (
             <div className="no-print p-4 bg-red-50 border border-red-200 rounded-xl max-w-4xl mx-auto flex items-center gap-3 text-red-800">
               <AlertTriangle className="w-5 h-5 shrink-0 text-red-600" />
@@ -687,17 +704,17 @@ export default function DespachosPage() {
               </div>
             </div>
           ) : (
-            <div className="no-print flex justify-center gap-2">
-              <Button onClick={() => window.print()} className="gap-2 bg-slate-900 hover:bg-slate-800">
-                <Printer className="w-4 h-4" /> Imprimir Documento de Ruta
+            // ACCIONES DE DESCARGA E IMPRESIÓN INTERACTIVA
+            <div className="no-print flex justify-center gap-3">
+              <Button onClick={handleDownloadPDF} className="gap-2 bg-blue-600 hover:bg-blue-500 font-medium text-white shadow-sm">
+                <Download className="w-4 h-4" /> Exportar Documento de Ruta
               </Button>
             </div>
           )}
 
-          {/* HOJA DE GUÍA FÍSICA / MANIFIESTO */}
+          {/* HOJA DE GUÍA FÍSICA / MANIFIESTO COMPILADO */}
           <div ref={printRef} className="bg-white text-black rounded-xl p-6 md:p-10 border shadow-md space-y-6 max-w-4xl mx-auto font-sans relative overflow-hidden">
             
-            {/* MARCA DE AGUA EN DIAGONAL CUANDO ESTÁ CANCELADO */}
             {guia.estado_entrega === 'Cancelado' && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-10 opacity-[0.08]">
                 <p className="text-[90px] font-black uppercase tracking-widest text-red-700 border-8 border-red-700 p-6 rounded-3xl rotate-12">
@@ -719,7 +736,6 @@ export default function DespachosPage() {
               </div>
             </div>
 
-            {/* BANNER INTERNO DE LA HOJA DE RUTA CANCELADA PARA AUDITORÍAS DE PAPEL */}
             {guia.estado_entrega === 'Cancelado' && (
               <div className="p-3 bg-red-600 text-white font-bold text-center rounded-lg text-xs uppercase tracking-wider shadow-sm">
                 ⚠️ ATENCIÓN: Este documento carece de validez legal de transporte. Cargamento Cancelado en Tránsito.
