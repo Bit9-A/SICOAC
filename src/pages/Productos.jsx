@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ShoppingBag, Search, Plus, Pencil, Trash2, X, Check, Barcode } from 'lucide-react'
+import { ShoppingBag, Search, Plus, Pencil, Trash2, X, Check, Barcode, ScanLine } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase'
 import { getCategorias, createCategoria, getSubcategorias } from '@/lib/api'
 import { normalizeText } from '@/lib/utils'
 import { toast } from 'sonner'
+import Scanner from '@/pages/Scanner'
 
 export default function ProductosPage() {
   const [productos, setProductos] = useState([])
@@ -28,6 +29,8 @@ export default function ProductosPage() {
   const [newSubcatId, setNewSubcatId] = useState('')
   const [newBarcode, setNewBarcode] = useState('')
   const [newBarcodeInput, setNewBarcodeInput] = useState('')
+  const [showScanner, setShowScanner] = useState(false)
+  const [scanTarget, setScanTarget] = useState(null) // 'new' | barcode line id for edit
 
   useEffect(() => { load() }, [])
 
@@ -116,6 +119,16 @@ export default function ProductosPage() {
     load()
   }
 
+  function handleBarcodeDetected(code) {
+    setShowScanner(false)
+    if (scanTarget === 'new') {
+      setNewBarcode(code.replace(/\D/g, ''))
+    } else {
+      setNewBarcodeInput(code.replace(/\D/g, ''))
+    }
+    setScanTarget(null)
+  }
+
   function startEdit(p) {
     setEditId(p.id)
     setEditNombre(p.nombre)
@@ -161,16 +174,22 @@ export default function ProductosPage() {
             </div>
             <div className="space-y-2">
               <Label>Código de barras</Label>
-              <Input
-                value={newBarcode}
-                onChange={e => {
-                  const value = e.target.value.replace(/\D/g, '')
-                  setNewBarcode(value)
-                }}
-                inputMode="numeric"
-                pattern="[0-9]*"
-                placeholder="Opcional"
-              />
+              <div className="flex gap-2">
+                <Input
+                  value={newBarcode}
+                  onChange={e => {
+                    const value = e.target.value.replace(/\D/g, '')
+                    setNewBarcode(value)
+                  }}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Opcional"
+                  className="flex-1"
+                />
+                <Button type="button" variant="outline" size="icon" onClick={() => { setScanTarget('new'); setShowScanner(true) }}>
+                  <ScanLine className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
             <div className="md:col-span-3 flex gap-2">
               <Button type="submit">Crear Producto</Button>
@@ -261,6 +280,15 @@ export default function ProductosPage() {
                       type="button"
                       size="sm"
                       variant="outline"
+                      className="h-8 text-xs px-2"
+                      onClick={() => { setScanTarget(p.id); setShowScanner(true) }}
+                    >
+                      <ScanLine className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
                       className="h-8 gap-1 text-xs"
                       disabled={!newBarcodeInput.trim()}
                       onClick={() => handleAddBarcode(p.id)}
@@ -313,6 +341,15 @@ export default function ProductosPage() {
         ))}
         {filtered.length === 0 && <p className="text-center text-muted-foreground py-8">No hay productos</p>}
       </div>
+
+      {/* Scanner overlay */}
+      {showScanner && (
+        <Scanner
+          onDetected={handleBarcodeDetected}
+          onClose={() => { setShowScanner(false); setScanTarget(null) }}
+          onManual={() => { setShowScanner(false); setScanTarget(null) }}
+        />
+      )}
     </div>
   )
 }
