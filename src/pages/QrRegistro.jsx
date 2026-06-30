@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react'
-import { QrCode, Share2, Copy, Check, Building2, Smartphone, Download, HeartHandshake, UserPlus, Shield, Eye } from 'lucide-react'
+import { QrCode, Share2, Copy, Check, Building2, Smartphone, Download, HeartHandshake, UserPlus, Shield, Eye, Lock, Ban, ClipboardList } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/context/AuthContext'
@@ -191,9 +191,9 @@ export default function QrRegistroPage() {
               <Shield className="w-4 h-4" /> Operador
             </div>
             <ul className="text-xs text-blue-700/80 dark:text-blue-300/80 space-y-1">
-              <li className="flex items-start gap-1.5"><span className="mt-0.5">✅</span> Inicia sesión en el sistema</li>
-              <li className="flex items-start gap-1.5"><span className="mt-0.5">✅</span> Registra movimientos y stock</li>
-              <li className="flex items-start gap-1.5"><span className="mt-0.5">✅</span> Accede a reportes</li>
+              <li className="flex items-start gap-1.5"><Check className="w-3.5 h-3.5 mt-0.5 shrink-0" /> Inicia sesión en el sistema</li>
+              <li className="flex items-start gap-1.5"><Check className="w-3.5 h-3.5 mt-0.5 shrink-0" /> Registra movimientos y stock</li>
+              <li className="flex items-start gap-1.5"><Check className="w-3.5 h-3.5 mt-0.5 shrink-0" /> Accede a reportes</li>
             </ul>
           </div>
           <div className="space-y-1.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/40">
@@ -201,9 +201,9 @@ export default function QrRegistroPage() {
               <Eye className="w-4 h-4" /> Voluntario
             </div>
             <ul className="text-xs text-amber-700/80 dark:text-amber-300/80 space-y-1">
-              <li className="flex items-start gap-1.5"><span className="mt-0.5">🔒</span> Solo censo de datos</li>
-              <li className="flex items-start gap-1.5"><span className="mt-0.5">🚫</span> Sin acceso al sistema</li>
-              <li className="flex items-start gap-1.5"><span className="mt-0.5">📋</span> Solo registro civil</li>
+              <li className="flex items-start gap-1.5"><Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" /> Solo censo de datos</li>
+              <li className="flex items-start gap-1.5"><Ban className="w-3.5 h-3.5 mt-0.5 shrink-0" /> Sin acceso al sistema</li>
+              <li className="flex items-start gap-1.5"><ClipboardList className="w-3.5 h-3.5 mt-0.5 shrink-0" /> Solo registro civil</li>
             </ul>
           </div>
         </div>
