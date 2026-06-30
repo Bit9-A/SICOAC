@@ -5,59 +5,66 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { SearchSelect } from '@/components/ui/search-select'
 import { supabase } from '@/lib/supabase'
-import { getCategorias, createCategoria } from '@/lib/api'
+import { getCategorias, createCategoria, getSubcategorias } from '@/lib/api'
 import { normalizeText } from '@/lib/utils'
 import { toast } from 'sonner'
 
 export default function ProductosPage() {
   const [productos, setProductos] = useState([])
   const [categorias, setCategorias] = useState([])
+  const [subcategorias, setSubcategorias] = useState([])
   const [filter, setFilter] = useState('')
   const [editId, setEditId] = useState(null)
   const [editNombre, setEditNombre] = useState('')
   const [editDesc, setEditDesc] = useState('')
   const [editCatId, setEditCatId] = useState('')
+  const [editSubcatId, setEditSubcatId] = useState('')
   const [showNew, setShowNew] = useState(false)
   const [newNombre, setNewNombre] = useState('')
   const [newDesc, setNewDesc] = useState('')
   const [newCatId, setNewCatId] = useState('')
+  const [newSubcatId, setNewSubcatId] = useState('')
   const [newBarcode, setNewBarcode] = useState('')
 
-  // Barcode editing state (per-product)
   const [newBarcodeInput, setNewBarcodeInput] = useState('')
 
   useEffect(() => { load() }, [])
 
   async function load() {
-    const [prods, cats] = await Promise.all([
+    const [prods, cats, subs] = await Promise.all([
       supabase
         .from('producto')
-        .select('*, categoria:categoria_id (nombre), producto_codigo (id, codigo)')
+        .select('*, categoria:categoria_id (nombre), subcategoria:subcategoria_id (nombre), producto_codigo (id, codigo)')
         .order('nombre'),
-      getCategorias()
+      getCategorias(),
+      getSubcategorias(),
     ])
     setProductos(prods.data || [])
     setCategorias(cats)
+    setSubcategorias(subs)
   }
 
   const filtered = productos.filter(p =>
     !filter || (p.nombre || '').toLowerCase().includes(filter.toLowerCase())
   )
 
+  const subcategoriasPorCat = (catId) =>
+    catId ? subcategorias.filter(s => String(s.categoriaId) === String(catId)) : []
+
   async function handleCreate(e) {
     e.preventDefault()
     if (!newNombre.trim() || !newCatId) return toast.warning('Completa nombre y categoría')
 
-    // Crear producto
     const { data: prod, error } = await supabase.from('producto').insert({
       nombre: normalizeText(newNombre),
       descripcion: normalizeText(newDesc),
       categoria_id: newCatId,
+      subcategoria_id: newSubcatId || null,
     }).select()
     if (error) return toast.error(error.message)
 
-    // Si hay código de barras, asociarlo
     if (newBarcode.trim()) {
       const { error: bcErr } = await supabase.from('producto_codigo').insert({
         producto_id: prod[0].id,
@@ -68,7 +75,7 @@ export default function ProductosPage() {
 
     toast.success('Producto creado')
     setShowNew(false)
-    setNewNombre(''); setNewDesc(''); setNewCatId(''); setNewBarcode('')
+    setNewNombre(''); setNewDesc(''); setNewCatId(''); setNewSubcatId(''); setNewBarcode('')
     load()
   }
 
@@ -77,7 +84,8 @@ export default function ProductosPage() {
     const { error } = await supabase.from('producto').update({
       nombre: normalizeText(editNombre),
       descripcion: normalizeText(editDesc),
-      categoria_id: editCatId
+      categoria_id: editCatId,
+      subcategoria_id: editSubcatId || null,
     }).eq('id', id)
     if (error) return toast.error(error.message)
     toast.success('Producto actualizado')
@@ -114,6 +122,7 @@ export default function ProductosPage() {
     setEditNombre(p.nombre)
     setEditDesc(p.descripcion || '')
     setEditCatId(String(p.categoria_id))
+    setEditSubcatId(p.subcategoria_id ? String(p.subcategoria_id) : '')
     setNewBarcodeInput('')
   }
 
@@ -131,14 +140,25 @@ export default function ProductosPage() {
         <Card className="p-5 space-y-4">
           <h3 className="font-semibold">Nuevo Producto</h3>
           <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2"><Label>Nombre *</Label><Input value={newNombre} onChange={e => setNewNombre(e.target.value)} /></div>
-            <div className="space-y-2"><Label>Descripción</Label><Input value={newDesc} onChange={e => setNewDesc(e.target.value)} /></div>
+            <div className="space-y-2"><Label>Nombre *</Label><Input value={newNombre} onChange={e => setNewNombre(e.target.value.toUpperCase())} /></div>
+            <div className="space-y-2"><Label>Descripción</Label><Input value={newDesc} onChange={e => setNewDesc(e.target.value.toUpperCase())} /></div>
             <div className="space-y-2">
               <Label>Categoría *</Label>
-              <select value={newCatId} onChange={e => setNewCatId(e.target.value)} className="flex h-10 w-full rounded-lg border border-input bg-secondary pl-3 py-2 text-sm">
-                <option value="">Seleccionar...</option>
-                {categorias.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
+              <SearchSelect
+                options={categorias}
+                value={newCatId}
+                onChange={v => { setNewCatId(v); setNewSubcatId('') }}
+                placeholder="Seleccionar..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Subcategoría</Label>
+              <SearchSelect
+                options={subcategoriasPorCat(newCatId)}
+                value={newSubcatId}
+                onChange={setNewSubcatId}
+                placeholder={newCatId ? 'Seleccionar...' : 'Primero selecciona una categoría'}
+              />
             </div>
             <div className="space-y-2">
               <Label>Código de barras</Label>
@@ -165,7 +185,7 @@ export default function ProductosPage() {
           <Card key={p.id} className="p-4">
             {editId === p.id ? (
               <div className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Nombre</Label>
                     <Input value={editNombre} onChange={e => setEditNombre(e.target.value)} />
@@ -176,13 +196,24 @@ export default function ProductosPage() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Categoría</Label>
-                    <select value={editCatId} onChange={e => setEditCatId(e.target.value)} className="flex h-10 w-full rounded-lg border border-input bg-secondary pl-3 py-2 text-sm">
-                      {categorias.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                    </select>
+                    <SearchSelect
+                      options={categorias}
+                      value={editCatId}
+                      onChange={v => { setEditCatId(v); setEditSubcatId('') }}
+                      placeholder="Seleccionar..."
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Subcategoría</Label>
+                    <SearchSelect
+                      options={subcategoriasPorCat(editCatId)}
+                      value={editSubcatId}
+                      onChange={setEditSubcatId}
+                      placeholder={editCatId ? 'Seleccionar...' : 'Primero selecciona una categoría'}
+                    />
                   </div>
                 </div>
 
-                {/* Barcode management in edit */}
                 <div className="border-t border-border/50 pt-3">
                   <Label className="text-xs mb-2 block">Códigos de barras</Label>
                   <div className="flex flex-wrap gap-2 mb-2">
@@ -238,7 +269,6 @@ export default function ProductosPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{p.nombre}</p>
                   <p className="text-sm text-muted-foreground truncate">{p.descripcion || '—'}</p>
-                  {/* Show barcodes inline */}
                   {(p.producto_codigo || []).length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-1">
                       {(p.producto_codigo || []).slice(0, 4).map(bc => (
@@ -253,7 +283,12 @@ export default function ProductosPage() {
                     </div>
                   )}
                 </div>
-                <Badge variant="secondary">{p.categoria?.nombre || '—'}</Badge>
+                <div className="flex flex-col items-end gap-0.5 shrink-0">
+                  <Badge variant="secondary">{p.categoria?.nombre || '—'}</Badge>
+                  {p.subcategoria?.nombre && (
+                    <span className="text-xs text-muted-foreground">{p.subcategoria.nombre}</span>
+                  )}
+                </div>
                 <div className="flex gap-1 shrink-0">
                   <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => startEdit(p)}><Pencil className="w-4 h-4" /></Button>
                   <Button variant="ghost" size="icon" className="w-8 h-8 text-destructive" onClick={() => handleDelete(p.id, p.nombre)}><Trash2 className="w-4 h-4" /></Button>
