@@ -5,6 +5,13 @@
 -- Ejecutar en el SQL Editor de Supabase.
 -- ============================================================
 
+-- 0. Asegurar que la columna rol sea text (en la DB actual puede ser integer)
+alter table public.usuarios drop constraint if exists usuarios_rol_check;
+alter table public.usuarios alter column rol type text using rol::text;
+alter table public.usuarios alter column rol set default 'operador';
+alter table public.usuarios add constraint usuarios_rol_check
+  check (rol in ('super_admin', 'admin', 'operador'));
+
 -- 1. Asegurar que existe el trigger para crear perfiles automáticos
 create or replace function public.handle_new_user()
 returns trigger
