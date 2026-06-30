@@ -29,3 +29,7 @@ create policy "Allow public select" on public.voluntarios for select using (true
 
 drop policy if exists "Allow public update" on public.voluntarios;
 create policy "Allow public update" on public.voluntarios for update using (true);
+
+alter table public.voluntarios
+  add column if not exists fecha_nacimiento date,
+  add column if not exists genero text;

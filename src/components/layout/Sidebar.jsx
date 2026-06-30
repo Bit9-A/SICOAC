@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   LayoutDashboard, Package, ClipboardList, Users, Building2, Settings, LogOut,
   ScanLine, ChevronLeft, Menu, ShoppingBag, Tags, QrCode, Truck, HeartHandshake, Contact, Car, ChevronUp
@@ -37,11 +37,49 @@ const NAV_ITEMS = {
 
 export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpenScan, user, profile }) {
   const [collapsed, setCollapsed] = useState(false)
+  const collapsedRef = useRef(collapsed)
+  const touchStartRef = useRef(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const items = NAV_ITEMS[rol] || NAV_ITEMS.admin
 
   const initials = profile ? (profile.nombre?.[0] || '') + (profile.apellido?.[0] || '') : '?'
+
+  useEffect(() => {
+    collapsedRef.current = collapsed
+  }, [collapsed])
+
+  useEffect(() => {
+    const SWIPE_ZONE = window.innerWidth * 0.2
+    const THRESHOLD = 50
+
+    const handleTouchStart = (e) => {
+      if (e.touches[0].clientX > SWIPE_ZONE) return
+      touchStartRef.current = e.touches[0].clientX
+    }
+
+    const handleTouchMove = (e) => {
+      if (touchStartRef.current === null) return
+      const delta = e.touches[0].clientX - touchStartRef.current
+      if (delta > THRESHOLD && collapsedRef.current) setCollapsed(false)
+      if (delta < -THRESHOLD && !collapsedRef.current) setCollapsed(true)
+      touchStartRef.current = null
+    }
+
+    const handleTouchEnd = () => {
+      touchStartRef.current = null
+    }
+
+    document.addEventListener('touchstart', handleTouchStart, { passive: true })
+    document.addEventListener('touchmove', handleTouchMove, { passive: true })
+    document.addEventListener('touchend', handleTouchEnd, { passive: true })
+
+    return () => {
+      document.removeEventListener('touchstart', handleTouchStart)
+      document.removeEventListener('touchmove', handleTouchMove)
+      document.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [])
 
   function handleLogout() {
     setShowConfirm(false)

@@ -85,8 +85,10 @@ export default function InstitucionesPage() {
         latitud: i.latitud,
         longitud: i.longitud,
         activo: i.activo,
-        parroquia: p?.nombre || '',
-        municipio: m?.nombre || '',
+        parroquiaId: p?.id || null,
+        parroquiaNombre: p?.nombre || '',
+        municipioId: m?.id || null,
+        municipioNombre: m?.nombre || '',
         estadoId: m?.estado_id || null,
         estadoNombre: '', // se llena después
       }
@@ -118,7 +120,7 @@ export default function InstitucionesPage() {
         if (!normalizeText(i.nombre).includes(q) && !normalizeText(i.direccion || '').includes(q)) return false
       }
       if (filtroEstado && String(i.estadoId) !== String(filtroEstado)) return false
-      if (filtroMunicipio && normalizeText(i.municipio) !== normalizeText(filtroMunicipio)) return false
+      if (filtroMunicipio && normalizeText(i.municipioNombre) !== normalizeText(filtroMunicipio)) return false
       if (filtroAyuda && !(i.tipos_ayuda || '').includes(filtroAyuda)) return false
       return true
     })
@@ -250,8 +252,10 @@ export default function InstitucionesPage() {
                   <p className="font-medium truncate">{i.nombre}</p>
                   {i.organizacion && <p className="text-xs text-muted-foreground truncate">{i.organizacion}</p>}
                   <p className="text-xs text-muted-foreground truncate">{i.direccion}</p>
-                  {(i.municipio || i.estadoNombre) && (
-                    <p className="text-xs text-muted-foreground">{i.municipio}, {i.estadoNombre}</p>
+                  {(i.municipioNombre || i.parroquiaNombre || i.estadoNombre) && (
+                    <p className="text-xs text-muted-foreground">
+                      {[i.parroquiaNombre, i.municipioNombre, i.estadoNombre].filter(Boolean).join(', ')}
+                    </p>
                   )}
                 </div>
               </div>
@@ -294,7 +298,7 @@ export default function InstitucionesPage() {
                 <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={() => {
                   const url = (i.latitud && i.longitud)
                     ? `https://www.google.com/maps?q=${i.latitud},${i.longitud}`
-                    : `https://www.google.com/maps?q=${encodeURIComponent(i.direccion + ', ' + i.municipio + ', ' + i.estadoNombre)}`
+                    : `https://www.google.com/maps?q=${encodeURIComponent(i.direccion + ', ' + i.municipioNombre + ', ' + i.estadoNombre)}`
                   window.open(url, '_blank')
                 }} title="Ver en Google Maps">
                   <MapPin className="w-3.5 h-3.5" /> Maps

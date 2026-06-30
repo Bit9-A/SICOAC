@@ -23,9 +23,9 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
   const online = useOnlineStatus()
   const { rol, institucionId: userInstId } = useAuth()
   const quantityRef = useRef(null)
-  const isOperator = rol === 'operador'
+  const isSuperAdmin = rol === 'super_admin'
 
-  const [step, setStep] = useState(isOperator ? 2 : 1)
+  const [step, setStep] = useState(isSuperAdmin ? 1 : 2)
 
   const [estados, setEstados] = useState([])
   const [municipios, setMunicipios] = useState([])
@@ -37,8 +37,8 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
   const [municipioId, setMunicipioId] = useState('')
   const [parroquiaId, setParroquiaId] = useState('')
 
-  const [institucionId, setInstitucionId] = useState(isOperator ? String(userInstId || '') : '')
-  const [institucionOrigenId, setInstitucionOrigenId] = useState(isOperator ? String(userInstId || '') : '')
+  const [institucionId, setInstitucionId] = useState(!isSuperAdmin ? String(userInstId || '') : '')
+  const [institucionOrigenId, setInstitucionOrigenId] = useState(!isSuperAdmin ? String(userInstId || '') : '')
   const [institucionDestinoId, setInstitucionDestinoId] = useState('')
   const [newInstitucionNombre, setNewInstitucionNombre] = useState('')
   const [direccion, setDireccion] = useState('')
@@ -186,7 +186,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
   const handleSelectInstitucion = async (id) => {
     setInstitucionId(id)
     setErrors({})
-    if (id === 'new' || isOperator) return
+    if (id === 'new' || !isSuperAdmin) return
     const inst = instituciones.find(i => String(i.value.to) === String(id))
     if (!inst) return
     setDireccion(inst.direccion || '')
@@ -230,64 +230,26 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     const qty = Number(quantity)
     if (!quantity || quantity.trim() === '' || isNaN(qty) || qty <= 0) newErrors.quantity = 'Ingresa una cantidad positiva'
 
-    const isTransfer = tipoMovimiento === 'Transferencia'
-    const isSalida = tipoMovimiento === 'Salida'
-
-    if (isTransfer) {
-      if (!institucionOrigenId) newErrors.institucionOrigenId = 'Selecciona el origen'
-      if (!institucionDestinoId) newErrors.institucionDestinoId = 'Selecciona el destino'
-      if (institucionOrigenId && institucionDestinoId && institucionOrigenId === institucionDestinoId) {
-        newErrors.institucionDestinoId = 'El destino debe ser diferente al origen'
-      }
-    } else {
-      if (!institucionId) newErrors.institucionId = 'Selecciona una institución'
-    }
+    if (!institucionId) newErrors.institucionId = 'Selecciona una institución'
 
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); toast.warning('Corrige los campos marcados'); return }
-
-    if ((isSalida || isTransfer) && !isNaN(qty) && qty > 0) {
-      const instId = isTransfer ? institucionOrigenId : institucionId
-      if (instId && barcodeOptions.length > 0) {
-        let prodId = null
-        const barcFound = barcodeOptions.find(o => o.value === barcode)
-        if (barcFound) prodId = barcFound.productId
-        if (!prodId) {
-          const prodFound = productOptions.find(o => o.value === product)
-          if (prodFound) prodId = prodFound.productId
-        }
-        if (prodId) {
-          const { data: stockData } = await supabase
-            .from('inventario')
-            .select('cantidad')
-            .eq('producto_id', prodId)
-            .eq('institucion_id', instId)
-            .maybeSingle()
-          const disponible = Number(stockData?.cantidad || 0)
-          if (qty > disponible) {
-            setErrors({ quantity: `Stock insuficiente: disponible ${disponible}, requerido ${qty}` })
-            toast.error(`Stock insuficiente: solo hay ${disponible} unidades disponibles`)
-            return
-          }
-        }
-      }
-    }
 
     setErrors({})
     setSaving(true)
     try {
       let finalInstId = institucionId
-      if (!isTransfer && institucionId === 'new') {
+      if (institucionId === 'new') {
         const newInst = await createInstitucion(newInstitucionNombre, direccion, parroquiaId)
         finalInstId = newInst.value
         const updated = await getInstituciones(); setInstituciones(updated)
       }
 
       const record = {
-        institucionId: isTransfer ? institucionOrigenId : finalInstId,
-        institucionOrigenId: isTransfer ? institucionOrigenId : null,
-        institucionDestinoId: isTransfer ? institucionDestinoId : null,
+        institucionId: finalInstId,
+        institucionOrigenId: null,
+        institucionDestinoId: null,
         direccion: normalizeText(direccion),
-        tipoMovimiento: isTransfer ? 'Transferencia' : (isOperator ? 'Entrada' : tipoMovimiento),
+        tipoMovimiento: 'Entrada',
         barcode: barcode.trim(),
         productName: normalizeText(product),
         description: normalizeText(description),
@@ -311,10 +273,10 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     } catch (err) {
       toast.error('Error — guardado en cola offline')
       addToQueue({
-        institucionId: isTransfer ? institucionOrigenId : institucionId,
-        institucionOrigenId: isTransfer ? institucionOrigenId : null,
-        institucionDestinoId: isTransfer ? institucionDestinoId : null,
-        tipoMovimiento: isTransfer ? 'Transferencia' : (isOperator ? 'Entrada' : tipoMovimiento),
+        institucionId: institucionId,
+        institucionOrigenId: null,
+        institucionDestinoId: null,
+        tipoMovimiento: 'Entrada',
         barcode: barcode.trim(), productName: normalizeText(product),
         description: normalizeText(description), quantity: qty, categoryId,
         subcategoriaId: subcategoriaId || null,
@@ -332,7 +294,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     setProduct(''); setProductOptions([])
     setDescription(''); setCategoryId(''); setSubcategoriaId(''); setPresentation(''); setQuantity('')
     setErrors({})
-    if (isOperator) {
+    if (!isSuperAdmin) {
       setStep(2)
     } else {
       setStep(1)
@@ -349,7 +311,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
       <div className="w-full max-w-xl mx-auto space-y-6">
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => step === 1 ? onBack() : setStep(1)}>
+          <Button variant="ghost" size="icon" onClick={() => (step === 1 || !isSuperAdmin) ? onBack() : setStep(1)}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div className="flex-1" />
@@ -360,17 +322,17 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
 
         <div>
           <h2 className="text-xl md:text-2xl font-bold">
-            {isOperator ? 'Registrar Entrada' : 'Registrar Movimiento'}
+            Registrar Entrada
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {isOperator
-              ? 'Registra los productos que llegan al centro de acopio'
-              : step === 1 ? 'Paso 1: Identifica el centro de acopio' : 'Paso 2: Completa los datos del movimiento'
+            {!isSuperAdmin
+              ? 'Registra los productos que ingresan al centro de acopio'
+              : step === 1 ? 'Paso 1: Identifica el centro de acopio' : 'Paso 2: Completa los datos del ingreso'
             }
           </p>
         </div>
 
-        {!isOperator && step === 1 && (
+        {isSuperAdmin && step === 1 && (
           <Card className="p-4 md:p-5 space-y-4">
             <div className="flex items-center gap-2 border-b border-border/50 pb-2">
               <Building className="w-5 h-5 text-primary" />
@@ -440,72 +402,23 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
         {step === 2 && (
           <form onSubmit={handleSubmit} className="space-y-6">
 
-            {tipoMovimiento === 'Transferencia' ? (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label>Origen *</Label>
-                  <SearchSelect
-                    options={instituciones.filter(i => String(i.value) !== String(institucionDestinoId))}
-                    value={institucionOrigenId}
-                    onChange={setInstitucionOrigenId}
-                    placeholder="Seleccionar origen..."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Destino *</Label>
-                  <SearchSelect
-                    options={instituciones.filter(i => String(i.value) !== String(institucionOrigenId))}
-                    value={institucionDestinoId}
-                    onChange={setInstitucionDestinoId}
-                    placeholder="Seleccionar destino..."
-                  />
-                </div>
+            <Card className="p-3 border-border/60 bg-card">
+              <div className="flex items-center gap-2 text-sm">
+                <Building className="w-4 h-4 text-primary shrink-0" />
+                <span className="font-medium truncate">
+                  {!isSuperAdmin
+                    ? (userProfile?.institucion?.nombre || selectedInstitution?.label || 'Mi institución')
+                    : (isNewInstitution ? newInstitucionNombre : selectedInstitution?.label)
+                  }
+                </span>
+                {direccion && <span className="text-muted-foreground truncate">— {direccion}</span>}
               </div>
-            ) : (
-              <Card className="p-3 border-border/60 bg-card">
-                <div className="flex items-center gap-2 text-sm">
-                  <Building className="w-4 h-4 text-primary shrink-0" />
-                  <span className="font-medium truncate">
-                    {isOperator
-                      ? (userProfile?.institucion?.nombre || 'Mi institución')
-                      : (isNewInstitution ? newInstitucionNombre : selectedInstitution?.label)
-                    }
-                  </span>
-                  {!isOperator && <span className="text-muted-foreground truncate">— {direccion}</span>}
-                </div>
-              </Card>
-            )}
-
-            <Card className="p-4 md:p-5 space-y-4">
-              <div className="flex items-center gap-2 border-b border-border/50 pb-2">
-                <ArrowDownCircle className="w-5 h-5 text-primary" />
-                <h3 className="font-semibold">2. Tipo de Movimiento</h3>
-              </div>
-              {isOperator ? (
-                <div className="flex items-center gap-3 rounded-lg bg-emerald-500/10 p-3 text-sm">
-                  <ArrowDownCircle className="w-5 h-5 text-emerald-400 shrink-0" />
-                  <span className="font-medium text-emerald-400">Entrada (Ingreso)</span>
-                  <span className="text-muted-foreground">— Solo registro de entradas</span>
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-2">
-                  <Button type="button" variant={tipoMovimiento === 'Entrada' ? 'default' : 'outline'} onClick={() => setTipoMovimiento('Entrada')} className="gap-2">
-                    <ArrowDownCircle className="w-4 h-4" /> Entrada
-                  </Button>
-                  <Button type="button" variant={tipoMovimiento === 'Salida' ? 'default' : 'outline'} onClick={() => setTipoMovimiento('Salida')} className="gap-2">
-                    <ArrowUpCircle className="w-4 h-4" /> Salida
-                  </Button>
-                  <Button type="button" variant={tipoMovimiento === 'Transferencia' ? 'default' : 'outline'} onClick={() => { setTipoMovimiento('Transferencia'); setStep(2) }} className="gap-2">
-                    <ArrowUpCircle className="w-4 h-4" /> Transferencia
-                  </Button>
-                </div>
-              )}
             </Card>
 
             <Card className="p-4 md:p-5 space-y-4">
               <div className="flex items-center gap-2 border-b border-border/50 pb-2">
                 <ShoppingBag className="w-5 h-5 text-primary" />
-                <h3 className="font-semibold">3. Producto</h3>
+                <h3 className="font-semibold">2. Producto</h3>
               </div>
 
                 <div className="space-y-2">
@@ -547,7 +460,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
 
               <div className="space-y-2">
                 <Label htmlFor="description">Descripción</Label>
-                <Textarea id="description" rows={2} placeholder="Detalle adicional..." value={description} onChange={e => setDescription(normalizeText(e.target.value))} />
+                <Textarea id="description" rows={2} placeholder="Detalle adicional..." value={description} onChange={e => setDescription(e.target.value)} />
               </div>
 
               <div className="space-y-2">
