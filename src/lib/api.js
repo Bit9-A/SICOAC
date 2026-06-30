@@ -184,7 +184,7 @@ export async function searchBarcodes(query) {
   const q = query.trim()
   const { data, error } = await supabase
     .from('producto_codigo')
-    .select('codigo, producto_id, producto (id, nombre, descripcion, presentacion, categoria_id)')
+    .select('codigo, producto_id, producto (id, nombre, descripcion, presentacion, categoria_id, subcategoria_id)')
     .ilike('codigo', `%${q}%`)
     .limit(8)
 
@@ -201,6 +201,7 @@ export async function searchBarcodes(query) {
     description: item.producto.descripcion || '',
     presentation: item.producto.presentacion || '',
     categoryId: item.producto.categoria_id,
+    subcategoriaId: item.producto.subcategoria_id,
   }))
 }
 
@@ -209,7 +210,7 @@ export async function searchProducts(query) {
   const q = query.trim()
   const { data, error } = await supabase
     .from('producto')
-    .select('id, nombre, descripcion, presentacion, categoria_id, categoria:categoria_id (nombre), producto_codigo (codigo)')
+    .select('id, nombre, descripcion, presentacion, categoria_id, subcategoria_id, categoria:categoria_id (nombre), producto_codigo (codigo)')
     .ilike('nombre', `%${q}%`)
     .limit(8)
 
@@ -229,6 +230,7 @@ export async function searchProducts(query) {
       productName: item.nombre,
       description: item.descripcion || '',
       categoryId: item.categoria_id,
+      subcategoriaId: item.subcategoria_id,
       presentation: item.presentacion || '',
       barcode: codes[0]?.codigo || '',
     }
@@ -241,7 +243,7 @@ export async function findProductByBarcode(barcode) {
   }
   const { data, error } = await supabase
     .from('producto_codigo')
-    .select('producto_id, producto (id, nombre, descripcion, presentacion, categoria_id)')
+    .select('producto_id, producto (id, nombre, descripcion, presentacion, categoria_id, subcategoria_id)')
     .eq('codigo', barcode.trim())
     .maybeSingle()
 
@@ -256,6 +258,7 @@ export async function findProductByBarcode(barcode) {
       description: data.producto.descripcion,
       presentation: data.producto.presentacion,
       categoryId: data.producto.categoria_id,
+      subcategoriaId: data.producto.subcategoria_id,
     }
   }
   return null
@@ -289,6 +292,7 @@ export async function sendRecord(record) {
         nombre: normalizeText(record.productName) || existingProduct.productName,
         descripcion: normalizeText(record.description) || existingProduct.description,
         categoria_id: finalCategoryId,
+        subcategoria_id: record.subcategoriaId || null,
       })
       .eq('id', finalProductId)
   } else {
@@ -300,6 +304,7 @@ export async function sendRecord(record) {
           nombre: normalizeText(record.productName),
           descripcion: normalizeText(record.description || ''),
           categoria_id: finalCategoryId,
+          subcategoria_id: record.subcategoriaId || null,
           institucion_id: record.institucionId || null,
         },
       ])
