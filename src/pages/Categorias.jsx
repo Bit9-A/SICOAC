@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Tags, Plus, Pencil, Trash2, X, Check, ListTree } from 'lucide-react'
+import { Tags, Plus, Pencil, Trash2, X, Check, ListTree, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,8 +9,7 @@ import { SearchSelect } from '@/components/ui/search-select'
 import { supabase } from '@/lib/supabase'
 import { normalizeText } from '@/lib/utils'
 import { toast } from 'sonner'
-
-const PAGE_SIZE = 10
+import Pagination from '@/components/ui/pagination'
 
 export default function CategoriasPage() {
   const [categorias, setCategorias] = useState([])
@@ -18,7 +17,10 @@ export default function CategoriasPage() {
   const [editNombre, setEditNombre] = useState('')
   const [showNew, setShowNew] = useState(false)
   const [newNombre, setNewNombre] = useState('')
-  const [catPage, setCatPage] = useState(1)
+  const [searchCat, setSearchCat] = useState('')
+  const [pageCat, setPageCat] = useState(1)
+  const [totalCat, setTotalCat] = useState(0)
+  const catPageSize = 10
 
   const [subcategorias, setSubcategorias] = useState([])
   const [showNewSub, setShowNewSub] = useState(false)
@@ -27,35 +29,40 @@ export default function CategoriasPage() {
   const [editSubId, setEditSubId] = useState(null)
   const [editSubNombre, setEditSubNombre] = useState('')
   const [editSubCategoriaId, setEditSubCategoriaId] = useState('')
-  const [subPage, setSubPage] = useState(1)
+  const [searchSub, setSearchSub] = useState('')
+  const [pageSub, setPageSub] = useState(1)
+  const [totalSub, setTotalSub] = useState(0)
+  const subPageSize = 10
   const [confirmDelete, setConfirmDelete] = useState(null)
 
-  useEffect(() => { loadAll() }, [])
-
-  async function loadAll() {
-    await Promise.all([loadCategorias(), loadSubcategorias()])
-  }
-
-  async function loadCategorias() {
-    const { data } = await supabase.from('categoria').select('*').order('nombre')
+  const loadCategorias = useCallback(async () => {
+    let query = supabase.from('categoria').select('*', { count: 'exact' }).order('nombre')
+    if (searchCat) query = query.ilike('nombre', `%${searchCat}%`)
+    const from = (pageCat - 1) * catPageSize
+    const to = from + catPageSize - 1
+    const { data, count } = await query.range(from, to)
     setCategorias(data || [])
-  }
+    setTotalCat(count ?? 0)
+  }, [pageCat, searchCat])
 
-  async function loadSubcategorias() {
-    const { data } = await supabase
+  const loadSubcategorias = useCallback(async () => {
+    let query = supabase
       .from('subcategoria')
-      .select('*, categoria:categoria_id(nombre)')
+      .select('*, categoria:categoria_id(nombre)', { count: 'exact' })
       .order('nombre')
+    if (searchSub) query = query.ilike('nombre', `%${searchSub}%`)
+    const from = (pageSub - 1) * subPageSize
+    const to = from + subPageSize - 1
+    const { data, count } = await query.range(from, to)
     setSubcategorias(data || [])
-  }
+    setTotalSub(count ?? 0)
+  }, [pageSub, searchSub])
 
-  const catTotalPages = Math.max(1, Math.ceil(categorias.length / PAGE_SIZE))
-  const subTotalPages = Math.max(1, Math.ceil(subcategorias.length / PAGE_SIZE))
-  const catPaginated = categorias.slice((catPage - 1) * PAGE_SIZE, catPage * PAGE_SIZE)
-  const subPaginated = subcategorias.slice((subPage - 1) * PAGE_SIZE, subPage * PAGE_SIZE)
+  const loadAll = useCallback(async () => {
+    await Promise.all([loadCategorias(), loadSubcategorias()])
+  }, [loadCategorias, loadSubcategorias])
 
-  useEffect(() => { if (catPage > catTotalPages) setCatPage(catTotalPages) }, [categorias.length])
-  useEffect(() => { if (subPage > subTotalPages) setSubPage(subTotalPages) }, [subcategorias.length])
+  useEffect(() => { loadAll() }, [loadAll])
 
   useEffect(() => {
     if (confirmDelete) {
@@ -167,65 +174,63 @@ export default function CategoriasPage() {
           </Card>
         )}
 
-        <div className="rounded-lg border border-border overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-secondary/50 text-sm">
-                <th className="text-left font-medium px-4 py-3">Nombre</th>
-                <th className="text-right font-medium px-4 py-3 w-28">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {catPaginated.map(c => (
-                <tr key={c.id} className="border-t border-border">
-                  {editId === c.id ? (
-                    <>
-                      <td className="px-4 py-2">
-                        <Input value={editNombre} onChange={e => setEditNombre(e.target.value)} autoFocus />
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <div className="flex gap-1 justify-end">
-                          <Button size="sm" onClick={() => handleSave(c.id)} className="gap-1"><Check className="w-3.5 h-3.5" /> Guardar</Button>
-                          <Button size="sm" variant="outline" onClick={() => setEditId(null)} className="gap-1"><X className="w-3.5 h-3.5" /></Button>
-                        </div>
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                            <Tags className="w-4 h-4 text-primary" />
+        <div className="space-y-3">
+          <div className="relative max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input value={searchCat} onChange={e => { setSearchCat(e.target.value); setPageCat(1) }} placeholder="Buscar categoría..." className="pl-9" />
+          </div>
+          <div className="rounded-lg border border-border overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-secondary/50 text-sm">
+                  <th className="text-left font-medium px-4 py-3">Nombre</th>
+                  <th className="text-right font-medium px-4 py-3 w-28">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {categorias.map(c => (
+                  <tr key={c.id} className="border-t border-border">
+                    {editId === c.id ? (
+                      <>
+                        <td className="px-4 py-2">
+                          <Input value={editNombre} onChange={e => setEditNombre(e.target.value)} autoFocus />
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <div className="flex gap-1 justify-end">
+                            <Button size="sm" onClick={() => handleSave(c.id)} className="gap-1"><Check className="w-3.5 h-3.5" /> Guardar</Button>
+                            <Button size="sm" variant="outline" onClick={() => setEditId(null)} className="gap-1"><X className="w-3.5 h-3.5" /></Button>
                           </div>
-                          <span className="font-medium">{c.nombre}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="icon" className="w-11 h-11" onClick={() => { setEditId(c.id); setEditNombre(c.nombre) }}><Pencil className="w-3.5 h-3.5" /></Button>
-                        <Button variant="ghost" size="icon" className="w-11 h-11 text-destructive" onClick={() => handleDelete(c.id, c.nombre)}><Trash2 className="w-3.5 h-3.5" /></Button>
-                      </td>
-                    </>
-                  )}
-                </tr>
-              ))}
-              {categorias.length === 0 && (
-                <tr>
-                  <td colSpan={2} className="text-center text-muted-foreground py-8">No hay categorías</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          {categorias.length > PAGE_SIZE && (
-            <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-secondary/30 text-sm">
-              <span className="text-muted-foreground">
-                {((catPage - 1) * PAGE_SIZE) + 1}–{Math.min(catPage * PAGE_SIZE, categorias.length)} de {categorias.length}
-              </span>
-              <div className="flex gap-1">
-                <Button variant="outline" size="sm" disabled={catPage <= 1} onClick={() => setCatPage(p => p - 1)}>Anterior</Button>
-                <Button variant="outline" size="sm" disabled={catPage >= catTotalPages} onClick={() => setCatPage(p => p + 1)}>Siguiente</Button>
-              </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                              <Tags className="w-4 h-4 text-primary" />
+                            </div>
+                            <span className="font-medium">{c.nombre}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Button variant="ghost" size="icon" className="w-11 h-11" onClick={() => { setEditId(c.id); setEditNombre(c.nombre) }}><Pencil className="w-3.5 h-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="w-11 h-11 text-destructive" onClick={() => handleDelete(c.id, c.nombre)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+                {categorias.length === 0 && (
+                  <tr>
+                    <td colSpan={2} className="text-center text-muted-foreground py-8">No hay categorías</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            <div className="border-t border-border">
+              <Pagination page={pageCat} totalPages={Math.ceil(totalCat / catPageSize)} onPageChange={setPageCat} className="py-2" />
             </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -271,83 +276,81 @@ export default function CategoriasPage() {
           </Card>
         )}
 
-        <div className="rounded-lg border border-border overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-secondary/50 text-sm">
-                <th className="text-left font-medium px-4 py-3">Categoría</th>
-                <th className="text-left font-medium px-4 py-3">Nombre</th>
-                <th className="text-right font-medium px-4 py-3 w-28">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {subPaginated.map(sc => (
-                <tr key={sc.id} className="border-t border-border">
-                  {editSubId === sc.id ? (
-                    <>
-                      <td className="px-4 py-2">
-                        <SearchSelect
-                          options={categorias.map(c => ({ value: String(c.id), label: c.nombre }))}
-                          value={String(editSubCategoriaId)}
-                          onChange={setEditSubCategoriaId}
-                          placeholder="Categoría..."
-                        />
-                      </td>
-                      <td className="px-4 py-2">
-                        <Input
-                          value={editSubNombre}
-                          onChange={e => setEditSubNombre(e.target.value.toUpperCase())}
-                          maxLength={200}
-                          className="uppercase"
-                          autoFocus
-                        />
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <div className="flex gap-1 justify-end">
-                          <Button size="sm" onClick={() => handleSaveSub(sc.id)} className="gap-1"><Check className="w-3.5 h-3.5" /> Guardar</Button>
-                          <Button size="sm" variant="outline" onClick={() => setEditSubId(null)} className="gap-1"><X className="w-3.5 h-3.5" /></Button>
-                        </div>
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-muted-foreground">{sc.categoria?.nombre}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                            <ListTree className="w-4 h-4 text-primary" />
+        <div className="space-y-3">
+          <div className="relative max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input value={searchSub} onChange={e => { setSearchSub(e.target.value); setPageSub(1) }} placeholder="Buscar subcategoría..." className="pl-9" />
+          </div>
+          <div className="rounded-lg border border-border overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-secondary/50 text-sm">
+                  <th className="text-left font-medium px-4 py-3">Categoría</th>
+                  <th className="text-left font-medium px-4 py-3">Nombre</th>
+                  <th className="text-right font-medium px-4 py-3 w-28">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subcategorias.map(sc => (
+                  <tr key={sc.id} className="border-t border-border">
+                    {editSubId === sc.id ? (
+                      <>
+                        <td className="px-4 py-2">
+                          <SearchSelect
+                            options={categorias.map(c => ({ value: String(c.id), label: c.nombre }))}
+                            value={String(editSubCategoriaId)}
+                            onChange={setEditSubCategoriaId}
+                            placeholder="Categoría..."
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <Input
+                            value={editSubNombre}
+                            onChange={e => setEditSubNombre(e.target.value.toUpperCase())}
+                            maxLength={200}
+                            className="uppercase"
+                            autoFocus
+                          />
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <div className="flex gap-1 justify-end">
+                            <Button size="sm" onClick={() => handleSaveSub(sc.id)} className="gap-1"><Check className="w-3.5 h-3.5" /> Guardar</Button>
+                            <Button size="sm" variant="outline" onClick={() => setEditSubId(null)} className="gap-1"><X className="w-3.5 h-3.5" /></Button>
                           </div>
-                          <span className="font-medium">{sc.nombre}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="icon" className="w-11 h-11 shrink-0" onClick={() => { setEditSubId(sc.id); setEditSubNombre(sc.nombre); setEditSubCategoriaId(String(sc.categoria_id)) }}><Pencil className="w-3.5 h-3.5" /></Button>
-                        <Button variant="ghost" size="icon" className="w-11 h-11 text-destructive shrink-0" onClick={() => handleDeleteSub(sc.id, sc.nombre)}><Trash2 className="w-3.5 h-3.5" /></Button>
-                      </td>
-                    </>
-                  )}
-                </tr>
-              ))}
-              {subcategorias.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="text-center text-muted-foreground py-8">No hay subcategorías</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          {subcategorias.length > PAGE_SIZE && (
-            <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-secondary/30 text-sm">
-              <span className="text-muted-foreground">
-                {((subPage - 1) * PAGE_SIZE) + 1}–{Math.min(subPage * PAGE_SIZE, subcategorias.length)} de {subcategorias.length}
-              </span>
-              <div className="flex gap-1">
-                <Button variant="outline" size="sm" disabled={subPage <= 1} onClick={() => setSubPage(p => p - 1)}>Anterior</Button>
-                <Button variant="outline" size="sm" disabled={subPage >= subTotalPages} onClick={() => setSubPage(p => p + 1)}>Siguiente</Button>
-              </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3">
+                          <span className="text-sm text-muted-foreground">{sc.categoria?.nombre}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                              <ListTree className="w-4 h-4 text-primary" />
+                            </div>
+                            <span className="font-medium">{sc.nombre}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <Button variant="ghost" size="icon" className="w-11 h-11 shrink-0" onClick={() => { setEditSubId(sc.id); setEditSubNombre(sc.nombre); setEditSubCategoriaId(String(sc.categoria_id)) }}><Pencil className="w-3.5 h-3.5" /></Button>
+                          <Button variant="ghost" size="icon" className="w-11 h-11 text-destructive shrink-0" onClick={() => handleDeleteSub(sc.id, sc.nombre)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+                {subcategorias.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="text-center text-muted-foreground py-8">No hay subcategorías</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            <div className="border-t border-border">
+              <Pagination page={pageSub} totalPages={Math.ceil(totalSub / subPageSize)} onPageChange={setPageSub} className="py-2" />
             </div>
-          )}
+          </div>
         </div>
       </div>
 

@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   Building2, Plus, Trash2, QrCode, Share2, X, Copy, Check,
-  Search, ChevronLeft, ChevronRight, Phone, Clock, Package, MapPin,
+  Search, Phone, Clock, Package, MapPin,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,10 +11,10 @@ import { Badge } from '@/components/ui/badge'
 import { SearchSelect } from '@/components/ui/search-select'
 import { supabase } from '@/lib/supabase'
 import { getEstados, getMunicipios, getParroquias, createInstitucion } from '@/lib/api'
-import { normalizeText } from '@/lib/utils'
 import { toast } from 'sonner'
+import Pagination from '@/components/ui/pagination'
 
-const ITEMS_PER_PAGE = 18
+const pageSize = 12
 
 export default function InstitucionesPage() {
   const [instituciones, setInstituciones] = useState([])
@@ -22,6 +22,7 @@ export default function InstitucionesPage() {
   const [municipios, setMunicipios] = useState([])
   const [showNew, setShowNew] = useState(false)
   const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
 
   // Filters
   const [search, setSearch] = useState('')
@@ -42,13 +43,16 @@ export default function InstitucionesPage() {
   const [qrInst, setQrInst] = useState(null)
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => { loadData() }, [])
+  // Estados (cargar una sola vez)
+  useEffect(() => { getEstados().then(setEstados) }, [])
+
+  // Municipios según estado
   useEffect(() => {
     if (filtroEstado) getMunicipios(filtroEstado).then(setMunicipios)
-    else { setMunicipios([]); setFiltroMunicipio(''); setPage(1) }
+    else { setMunicipios([]); setFiltroMunicipio('') }
   }, [filtroEstado])
-  useEffect(() => { setPage(1) }, [search, filtroEstado, filtroMunicipio, filtroAyuda])
 
+  // Form municipios/parroquias
   useEffect(() => {
     if (newEstado) getMunicipios(newEstado).then(setFormMunicipios)
     else { setFormMunicipios([]); setNewMunicipio('') }
@@ -58,19 +62,38 @@ export default function InstitucionesPage() {
     else { setFormParroquias([]); setNewParroquia('') }
   }, [newMunicipio])
 
-  async function loadData() {
-    const [insts, ests] = await Promise.all([getInstitucionesFull(), getEstados()])
-    setInstituciones(insts)
-    setEstados(ests)
-  }
-
-  async function getInstitucionesFull() {
-    const { data } = await supabase
+  // Carga server-side con filtros y paginación
+  const load = useCallback(async () => {
+    let query = supabase
       .from('institucion')
-      .select('*, parroquia:parroquia_id (id, nombre, municipio:municipio_id (id, nombre, estado_id))')
+      .select('*, parroquia:parroquia_id (id, nombre, municipio:municipio_id (id, nombre, estado_id))', { count: 'exact' })
       .order('nombre')
 
-    return (data || []).map(i => {
+    if (search) {
+      query = query.or(`nombre.ilike.%${search}%,direccion.ilike.%${search}%`)
+    }
+    if (filtroEstado) {
+      query = query.eq('parroquia.municipio.estado_id', filtroEstado)
+    }
+    if (filtroMunicipio) {
+      query = query.eq('parroquia.municipio_id', filtroMunicipio)
+    }
+    if (filtroAyuda) {
+      query = query.ilike('tipos_ayuda', `%${filtroAyuda}%`)
+    }
+
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+
+    const { data, count, error } = await query.range(from, to)
+
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+
+    setTotal(count || 0)
+    setInstituciones((data || []).map(i => {
       const p = i.parroquia
       const m = p?.municipio
       return {
@@ -90,10 +113,12 @@ export default function InstitucionesPage() {
         municipioId: m?.id || null,
         municipioNombre: m?.nombre || '',
         estadoId: m?.estado_id || null,
-        estadoNombre: '', // se llena después
+        estadoNombre: '',
       }
-    })
-  }
+    }))
+  }, [page, search, filtroEstado, filtroMunicipio, filtroAyuda])
+
+  useEffect(() => { load() }, [load])
 
   // Llenar estadoNombre
   useEffect(() => {
@@ -112,22 +137,6 @@ export default function InstitucionesPage() {
     return [...set].sort()
   }, [instituciones])
 
-  // Filtrar
-  const filtradas = useMemo(() => {
-    return instituciones.filter(i => {
-      if (search) {
-        const q = normalizeText(search)
-        if (!normalizeText(i.nombre).includes(q) && !normalizeText(i.direccion || '').includes(q)) return false
-      }
-      if (filtroEstado && String(i.estadoId) !== String(filtroEstado)) return false
-      if (filtroMunicipio && normalizeText(i.municipioNombre) !== normalizeText(filtroMunicipio)) return false
-      if (filtroAyuda && !(i.tipos_ayuda || '').includes(filtroAyuda)) return false
-      return true
-    })
-  }, [instituciones, search, filtroEstado, filtroMunicipio, filtroAyuda])
-
-  const totalPages = Math.ceil(filtradas.length / ITEMS_PER_PAGE)
-  const paginadas = filtradas.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -135,7 +144,7 @@ export default function InstitucionesPage() {
     await createInstitucion(newNombre, newDir, newParroquia)
     toast.success('Institución creada')
     setShowNew(false); setNewNombre(''); setNewDir(''); setNewEstado(''); setNewMunicipio(''); setNewParroquia('')
-    loadData()
+    load()
   }
 
   async function handleDelete(id, nombre) {
@@ -143,7 +152,7 @@ export default function InstitucionesPage() {
     const { error } = await supabase.from('institucion').delete().eq('id', id)
     if (error) return toast.error(error.message)
     toast.success('Institución eliminada')
-    loadData()
+    load()
   }
 
   function getRegisterUrl(instId) {
@@ -187,7 +196,7 @@ export default function InstitucionesPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Instituciones</h1>
-          <p className="text-sm text-muted-foreground mt-1">{filtradas.length} centro(s) de acopio</p>
+          <p className="text-sm text-muted-foreground mt-1">{total} centro(s) de acopio</p>
         </div>
         <Button onClick={() => setShowNew(!showNew)} className="gap-2"><Plus className="w-4 h-4" /> Nueva</Button>
       </div>
@@ -215,23 +224,23 @@ export default function InstitucionesPage() {
             <Label className="text-xs">Buscar</Label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input value={search} onChange={e => setSearch(e.target.value.toUpperCase())} placeholder="Nombre o dirección..." className="pl-9" />
+              <Input value={search} onChange={e => { setSearch(e.target.value.toUpperCase()); setPage(1) }} placeholder="Nombre o dirección..." className="pl-9" />
             </div>
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Estado</Label>
-            <SearchSelect options={estados} value={filtroEstado} onChange={v => { setFiltroEstado(v); setFiltroMunicipio('') }} placeholder="Todos" />
+            <SearchSelect options={estados} value={filtroEstado} onChange={v => { setFiltroEstado(v); setFiltroMunicipio(''); setPage(1) }} placeholder="Todos" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Municipio</Label>
-            <SearchSelect options={municipios} value={filtroMunicipio} onChange={setFiltroMunicipio} placeholder={filtroEstado ? 'Seleccionar...' : 'Primero Estado'} />
+            <SearchSelect options={municipios} value={filtroMunicipio} onChange={v => { setFiltroMunicipio(v); setPage(1) }} placeholder={filtroEstado ? 'Seleccionar...' : 'Primero Estado'} />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Tipo de ayuda</Label>
             <SearchSelect
               options={tiposDisponibles.map(t => ({ value: t, label: t }))}
               value={filtroAyuda}
-              onChange={setFiltroAyuda}
+              onChange={v => { setFiltroAyuda(v); setPage(1) }}
               placeholder="Todos"
             />
           </div>
@@ -240,7 +249,7 @@ export default function InstitucionesPage() {
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {paginadas.map(i => {
+        {instituciones.map(i => {
           const tipos = (i.tipos_ayuda || '').split('|').filter(Boolean)
           return (
             <Card key={i.id} className="p-4 space-y-2">
@@ -311,25 +320,12 @@ export default function InstitucionesPage() {
             </Card>
           )
         })}
-        {filtradas.length === 0 && (
+        {instituciones.length === 0 && (
           <p className="text-center text-muted-foreground py-8 col-span-full">No hay instituciones con esos filtros</p>
         )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3">
-          <Button variant="outline" size="sm" className="gap-1" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
-            <ChevronLeft className="w-4 h-4" /> Anterior
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Página {page} de {totalPages}
-          </span>
-          <Button variant="outline" size="sm" className="gap-1" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-            Siguiente <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
-      )}
+      <Pagination page={page} totalPages={Math.ceil(total / pageSize)} onPageChange={setPage} />
 
       {/* QR Dialog */}
       {qrInst && (

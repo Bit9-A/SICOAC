@@ -542,11 +542,28 @@ export async function createVoluntario({ cedula, nombre, apellido, email, telefo
   return data
 }
 
-export async function getVoluntarios(institucionId) {
-  let q = supabase.from('voluntarios').select('*, institucion:institucion_id (nombre)').order('created_at', { ascending: false })
+export async function getVoluntarios({ institucionId, page = 1, pageSize = 20, search = '', filtroInst = '', filtroDia = '' } = {}) {
+  let q = supabase.from('voluntarios').select('*, institucion:institucion_id (nombre)', { count: 'exact' })
+
   if (institucionId) q = q.eq('institucion_id', institucionId)
-  const { data } = await q
-  return data || []
+  if (filtroInst) q = q.eq('institucion_id', filtroInst)
+
+  if (search) {
+    const s = normalizeText(search)
+    q = q.or(`nombre.ilike.%${s}%,apellido.ilike.%${s}%,cedula.ilike.%${s}%,email.ilike.%${s}%`)
+  }
+
+  if (filtroDia) q = q.ilike('disponibilidad_dias', `%${filtroDia}%`)
+
+  q = q.order('created_at', { ascending: false })
+
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+  q = q.range(from, to)
+
+  const { data, count, error } = await q
+  if (error) throw error
+  return { data: data || [], count: count || 0 }
 }
 
 export function isConfigured() {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { HeartHandshake, Search, Download, Clock, Phone, Mail, Building2, UserCheck, UserX, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext'
 import { cn, normalizeText } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import Pagination from '@/components/ui/pagination'
 
 export default function VoluntariosPage() {
   const { institucionId, isSuperAdmin } = useAuth()
@@ -20,6 +21,10 @@ export default function VoluntariosPage() {
   const [filtroInst, setFiltroInst] = useState('')
   const [filtroDia, setFiltroDia] = useState('')
 
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const pageSize = 20
+
   const tieneInstitucion = !!institucionId
 
   const DIAS = [
@@ -28,27 +33,17 @@ export default function VoluntariosPage() {
     { key: 'D', label: 'Dom' },
   ]
 
-  useEffect(() => { load() }, [])
-
-  async function load() {
-    const [vols, insts] = await Promise.all([getVoluntarios(institucionId), getInstituciones()])
-    setVoluntarios(vols)
+  const load = useCallback(async () => {
+    const [res, insts] = await Promise.all([
+      getVoluntarios({ institucionId, page, pageSize, search, filtroInst, filtroDia }),
+      getInstituciones()
+    ])
+    setVoluntarios(res.data)
+    setTotal(res.count)
     setInstituciones(insts)
-  }
+  }, [page, search, filtroInst, filtroDia, institucionId])
 
-  const filtrados = useMemo(() => {
-    return voluntarios.filter(v => {
-      if (search) {
-        const q = normalizeText(search)
-        if (!normalizeText(v.nombre + ' ' + v.apellido).includes(q) &&
-            !normalizeText(v.cedula || '').includes(q) &&
-            !normalizeText(v.email || '').includes(q)) return false
-      }
-      if (filtroInst && String(v.institucion_id) !== String(filtroInst)) return false
-      if (filtroDia && !(v.disponibilidad_dias || '').includes(filtroDia)) return false
-      return true
-    })
-  }, [voluntarios, search, filtroInst])
+  useEffect(() => { load() }, [load])
 
   async function handleToggleActivo(v) {
     const { error } = await supabase.from('voluntarios').update({ activo: !v.activo }).eq('id', v.id)
@@ -57,7 +52,7 @@ export default function VoluntariosPage() {
   }
 
   function exportCSV() {
-    const rows = filtrados.map(v =>
+    const rows = voluntarios.map(v =>
       [v.cedula, v.nombre, v.apellido, v.email, v.telefono, v.disponibilidad_dias, v.disponibilidad_hora_desde, v.disponibilidad_hora_hasta, v.institucion?.nombre].join(',')
     )
     const csv = ['cedula,nombre,apellido,email,telefono,dias,desde,hasta,institucion', ...rows].join('\n')
@@ -73,7 +68,7 @@ export default function VoluntariosPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold">Voluntarios</h1>
-          <p className="text-sm text-muted-foreground mt-1">{filtrados.length} voluntario(s) registrados</p>
+          <p className="text-sm text-muted-foreground mt-1">{total} voluntario(s) registrados</p>
         </div>
         <Button variant="outline" className="gap-2" onClick={exportCSV}>
           <Download className="w-4 h-4" /> Exportar CSV
@@ -86,25 +81,25 @@ export default function VoluntariosPage() {
             <Label className="text-xs">Buscar</Label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nombre, cédula o email..." className="pl-9" />
+              <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1) }} placeholder="Nombre, cédula o email..." className="pl-9" />
             </div>
           </div>
           {!tieneInstitucion && (
             <div className="space-y-1">
               <Label className="text-xs">Institución</Label>
-              <SearchSelect options={instituciones} value={filtroInst} onChange={setFiltroInst} placeholder="Todas" />
+              <SearchSelect options={instituciones} value={filtroInst} onChange={v => { setFiltroInst(v); setPage(1) }} placeholder="Todas" />
             </div>
           )}
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Disponibilidad por día</Label>
           <div className="flex flex-wrap gap-1.5">
-            <button onClick={() => setFiltroDia('')}
+            <button onClick={() => { setFiltroDia(''); setPage(1) }}
               className={cn('px-2.5 py-1 rounded-lg text-xs border transition-colors',
                 !filtroDia ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary text-muted-foreground border-input'
               )}>Todos</button>
             {DIAS.map(d => (
-              <button key={d.key} onClick={() => setFiltroDia(d.key)}
+              <button key={d.key} onClick={() => { setFiltroDia(d.key); setPage(1) }}
                 className={cn('px-2.5 py-1 rounded-lg text-xs border transition-colors',
                   filtroDia === d.key ? 'bg-primary text-primary-foreground border-primary' : 'bg-secondary text-muted-foreground border-input'
                 )}>{d.label}</button>
@@ -114,7 +109,7 @@ export default function VoluntariosPage() {
       </Card>
 
       <div className="space-y-2">
-        {filtrados.map(v => (
+        {voluntarios.map(v => (
           <Card key={v.id} className="p-4">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -148,8 +143,10 @@ export default function VoluntariosPage() {
             </div>
           </Card>
         ))}
-        {filtrados.length === 0 && <p className="text-center text-muted-foreground py-8">No hay voluntarios registrados</p>}
+        {voluntarios.length === 0 && <p className="text-center text-muted-foreground py-8">No hay voluntarios registrados</p>}
       </div>
+
+      <Pagination page={page} totalPages={Math.ceil(total / pageSize)} onPageChange={setPage} />
     </div>
   )
 }

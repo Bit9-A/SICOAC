@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ClipboardList, Search, ArrowDownCircle, ArrowUpCircle, ArrowLeftRight, Filter, CheckCircle, Clock, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,44 +9,60 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { getInstituciones } from '@/lib/api'
 import { normalizeText } from '@/lib/utils'
+import Pagination from '@/components/ui/pagination'
 
 export default function RegistrosPage() {
   const { institucionId, isSuperAdmin } = useAuth()
   const [movimientos, setMovimientos] = useState([])
   const [instituciones, setInstituciones] = useState([])
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
   const [filterTipo, setFilterTipo] = useState('')
   const [loading, setLoading] = useState(true)
+  const pageSize = 20
 
   useEffect(() => {
-    Promise.all([loadMovimientos(), getInstituciones().then(setInstituciones)])
+    loadMovimientos()
+  }, [loadMovimientos])
+
+  useEffect(() => {
+    getInstituciones().then(setInstituciones)
   }, [])
 
-  async function loadMovimientos() {
+  const loadMovimientos = useCallback(async () => {
     setLoading(true)
     let q = supabase
       .from('movimiento')
-      .select('*, producto:producto_id (nombre), institucion_origen:institucion_origen_id (nombre), institucion_destino:institucion_destino_id (nombre), tipo:tipo_movimiento_id (nombre)')
+      .select('*, producto:producto_id (nombre), institucion_origen:institucion_origen_id (nombre), institucion_destino:institucion_destino_id (nombre), tipo:tipo_movimiento_id (nombre)', { count: 'exact' })
       .order('created_at', { ascending: false })
-      .limit(100)
 
     if (!isSuperAdmin && institucionId) {
       q = q.or(`institucion_origen_id.eq.${institucionId},institucion_destino_id.eq.${institucionId}`)
     }
 
-    const { data } = await q
+    if (search) {
+      q = q.ilike('producto.nombre', `%${search}%`)
+    }
+
+    const from = (page - 1) * pageSize
+    const to = from + pageSize - 1
+    q = q.range(from, to)
+
+    const { data, count } = await q
     setMovimientos(data || [])
+    setTotal(count || 0)
     setLoading(false)
+  }, [page, search, institucionId, isSuperAdmin])
+
+  const handleSearchChange = (value) => {
+    setSearch(value)
+    setPage(1)
   }
 
-  const filtered = movimientos.filter(m => {
-    if (filterTipo && m.tipo?.nombre !== filterTipo) return false
-    if (search) {
-      const q = normalizeText(search)
-      if (!(m.producto?.nombre || '').includes(q)) return false
-    }
-    return true
-  })
+  const movimientosFiltrados = filterTipo
+    ? movimientos.filter(m => m.tipo?.nombre === filterTipo)
+    : movimientos
 
   function EstadoBadge({ m }) {
     if (m.tipo?.nombre !== 'Transferencia') return null
@@ -78,8 +94,8 @@ export default function RegistrosPage() {
         <div className="space-y-1">
           <Label className="text-xs">Buscar producto</Label>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input value={search} onChange={e => setSearch(e.target.value.toUpperCase())} placeholder="Producto..." className="pl-9 w-48" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input value={search} onChange={e => handleSearchChange(e.target.value)} placeholder="Producto..." className="pl-9 w-48" />
           </div>
         </div>
         <div className="space-y-1">
@@ -130,7 +146,7 @@ export default function RegistrosPage() {
         <p className="text-center text-muted-foreground py-8">Cargando movimientos...</p>
       ) : (
         <div className="space-y-2">
-          {filtered.map(m => (
+          {movimientosFiltrados.map(m => (
             <Card key={m.id} className="p-4">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -165,8 +181,15 @@ export default function RegistrosPage() {
               </div>
             </Card>
           ))}
-          {filtered.length === 0 && <p className="text-center text-muted-foreground py-8">No hay movimientos registrados</p>}
+          {movimientosFiltrados.length === 0 && <p className="text-center text-muted-foreground py-8">No hay movimientos registrados</p>}
         </div>
+      )}
+      {!loading && (
+        <Pagination
+          page={page}
+          totalPages={Math.ceil(total / pageSize)}
+          onPageChange={setPage}
+        />
       )}
     </div>
   )

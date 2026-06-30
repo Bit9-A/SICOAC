@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Truck, Plus, Search, X, Printer, Eye, Package, Building2, PlusCircle,
   FileText, Contact, Hash, CheckCircle, XCircle, AlertTriangle, ArrowUpRight, ArrowDownLeft, Download, ScanLine
@@ -15,6 +15,7 @@ import { findProductByBarcode } from '@/lib/api'
 import { getInstituciones } from '@/lib/api'
 import { useAuth } from '@/context/AuthContext'
 import { normalizeText } from '@/lib/utils'
+import Pagination from '@/components/ui/pagination'
 import { toast } from 'sonner'
 import Scanner from '@/pages/Scanner'
 
@@ -53,9 +54,14 @@ export default function DespachosPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
 
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const pageSize = 20
+
   useEffect(() => { 
     if (view === 'list') fetchDespachos() 
-  }, [activeTab, origenId])
+  }, [fetchDespachos, view])
 
   useEffect(() => { loadData() }, [origenId])
 
@@ -69,11 +75,9 @@ export default function DespachosPage() {
     setInstituciones(insts)
     setChoferes((choferesRes.data || []).map(c => ({ value: String(c.id), label: `${c.nombre} ${c.apellido} — C.I: ${c.cedula}` })))
     setVehiculos((vehiculosRes.data || []).map(v => ({ value: String(v.id), label: `${v.marca || ''} ${v.modelo} [Placa: ${v.placa}]` })))
-    
-    fetchDespachos()
   }
 
-  async function fetchDespachos() {
+  const fetchDespachos = useCallback(async () => {
     let q = supabase
       .from('despacho')
       .select(`
@@ -83,8 +87,12 @@ export default function DespachosPage() {
         destino:institucion_destino_id (nombre),
         chofer:chofer_id (nombre, apellido),
         vehiculo:vehiculo_id (marca, modelo, placa)
-      `)
+      `, { count: 'exact' })
       .order('created_at', { ascending: false })
+
+    if (search) {
+      q = q.or(`numero_guia.ilike.%${search}%,detalles_destino.ilike.%${search}%`)
+    }
 
     if (!isSuperAdmin && institucionId) {
       if (activeTab === 'salidas') {
@@ -94,10 +102,15 @@ export default function DespachosPage() {
       }
     }
 
-    const { data, error } = await q
+    const from = (page - 1) * pageSize
+    const to = page * pageSize - 1
+    q = q.range(from, to)
+
+    const { data, count, error } = await q
     if (error) toast.error('Error al cargar rutas: ' + error.message)
     setDespachos(data || [])
-  }
+    setTotal(count || 0)
+  }, [page, search, activeTab, origenId, isSuperAdmin, institucionId])
 
   useEffect(() => {
     if (prodSearch.trim().length < 2 || !origenId) { setProdResults([]); return }
@@ -179,6 +192,11 @@ export default function DespachosPage() {
 
   function resetForm() {
     setDestinoId(''); setChoferId(''); setVehiculoId(''); setDetallesDestino(''); setCart([])
+  }
+
+  function handleSearchChange(value) {
+    setSearch(value)
+    setPage(1)
   }
 
   async function handleCreate(e) {
@@ -540,11 +558,28 @@ export default function DespachosPage() {
             </div>
           )}
 
-          {despachos.length === 0 && (
+          {/* Search */}
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={search}
+              onChange={e => handleSearchChange(e.target.value)}
+              placeholder="Buscar por número de guía o institución..."
+              className="pl-9"
+            />
+          </div>
+
+          {despachos.length === 0 && !search && (
             <p className="text-center text-muted-foreground py-12 bg-slate-50 rounded-xl border border-dashed">
               {activeTab === 'salidas' 
                 ? 'No has realizado ninguna salida o transferencia de recursos' 
                 : 'No registras cargamentos en ruta asignados hacia tu institución'}
+            </p>
+          )}
+
+          {despachos.length === 0 && search && (
+            <p className="text-center text-muted-foreground py-12 bg-slate-50 rounded-xl border border-dashed">
+              No se encontraron despachos que coincidan con "{search}"
             </p>
           )}
 
@@ -597,6 +632,12 @@ export default function DespachosPage() {
               </div>
             </Card>
           ))}
+
+          <Pagination
+            page={page}
+            totalPages={Math.ceil(total / pageSize)}
+            onPageChange={setPage}
+          />
         </div>
       )}
 
