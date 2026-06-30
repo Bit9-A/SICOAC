@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import Pagination from '@/components/ui/pagination'
 import { SearchSelect } from '@/components/ui/search-select'
 import { supabase } from '@/lib/supabase'
 import { getCategorias, createCategoria, getSubcategorias, searchProducts } from '@/lib/api'
@@ -16,7 +17,10 @@ export default function ProductosPage() {
   const [productos, setProductos] = useState([])
   const [categorias, setCategorias] = useState([])
   const [subcategorias, setSubcategorias] = useState([])
-  const [filter, setFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const pageSize = 20
   const [editId, setEditId] = useState(null)
   const [editNombre, setEditNombre] = useState('')
   const [editDesc, setEditDesc] = useState('')
@@ -34,25 +38,32 @@ export default function ProductosPage() {
   const [newProductOptions, setNewProductOptions] = useState([])
   const [newProductSearching, setNewProductSearching] = useState(false)
 
-  useEffect(() => { load() }, [])
-
-  async function load() {
-    const [prods, cats, subs] = await Promise.all([
-      supabase
-        .from('producto')
-        .select('*, categoria:categoria_id (nombre), subcategoria:subcategoria_id (nombre), producto_codigo (id, codigo)')
-        .order('nombre'),
+  const load = useCallback(async () => {
+    let q = supabase
+      .from('producto')
+      .select('*, categoria:categoria_id (nombre), subcategoria:subcategoria_id (nombre), producto_codigo (id, codigo)', { count: 'exact' })
+    if (search) {
+      q = q.or(`nombre.ilike.%${search}%,presentacion.ilike.%${search}%`)
+    }
+    q = q.order('nombre')
+    const rangeStart = (page - 1) * pageSize
+    const [{ data, count }, cats, subs] = await Promise.all([
+      q.range(rangeStart, rangeStart + pageSize - 1),
       getCategorias(),
       getSubcategorias(),
     ])
-    setProductos(prods.data || [])
+    setProductos(data || [])
+    setTotal(count || 0)
     setCategorias(cats)
     setSubcategorias(subs)
-  }
+  }, [page, search])
 
-  const filtered = productos.filter(p =>
-    !filter || (p.nombre || '').toLowerCase().includes(filter.toLowerCase())
-  )
+  useEffect(() => { load() }, [load])
+
+  function handleSearchChange(value) {
+    setSearch(value)
+    setPage(1)
+  }
 
   const subcategoriasPorCat = (catId) =>
     catId ? subcategorias.filter(s => String(s.categoriaId) === String(catId)) : []
@@ -236,12 +247,12 @@ export default function ProductosPage() {
       )}
 
       <div className="relative w-full sm:max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="Buscar producto..." value={filter} onChange={e => setFilter(e.target.value.toUpperCase())} className="pl-9 w-full" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <Input placeholder="Buscar producto..." value={search} onChange={e => handleSearchChange(e.target.value)} className="pl-9 w-full" />
       </div>
 
       <div className="space-y-2">
-        {filtered.map(p => (
+        {productos.map(p => (
           <Card key={p.id} className="p-4">
             {editId === p.id ? (
               <div className="space-y-3">
@@ -377,8 +388,15 @@ export default function ProductosPage() {
             )}
           </Card>
         ))}
-        {filtered.length === 0 && <p className="text-center text-muted-foreground py-8">No hay productos</p>}
+        {productos.length === 0 && <p className="text-center text-muted-foreground py-8">No hay productos</p>}
       </div>
+
+      <Pagination
+        page={page}
+        totalPages={Math.ceil(total / pageSize)}
+        onPageChange={setPage}
+        className="mt-2"
+      />
 
       {/* Scanner overlay */}
       {showScanner && (

@@ -1,17 +1,21 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Car, Search, Plus, Pencil, X, Check, ToggleLeft, ToggleRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Pagination } from '@/components/ui/pagination'
 import { supabase } from '@/lib/supabase'
 import { normalizeText } from '@/lib/utils'
 import { toast } from 'sonner'
 
 export default function VehiculosPage() {
   const [vehiculos, setVehiculos] = useState([])
-  const [filter, setFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const pageSize = 20
   const [editId, setEditId] = useState(null)
   
   const [editMarca, setEditMarca] = useState('')
@@ -26,24 +30,25 @@ export default function VehiculosPage() {
   const [newColor, setNewColor] = useState('')
   const [newCapacidad, setNewCapacidad] = useState('')
 
-  useEffect(() => { load() }, [])
-
-  async function load() {
-    const { data, error } = await supabase
-      .from('vehiculo')
-      .select('*')
-      .order('modelo')
-    
+  const load = useCallback(async () => {
+    let q = supabase.from('vehiculo').select('*', { count: 'exact' })
+    if (search) {
+      q = q.or(`placa.ilike.%${search}%,modelo.ilike.%${search}%,marca.ilike.%${search}%`)
+    }
+    q = q.order('modelo')
+    const rangeStart = (page - 1) * pageSize
+    const { data, count, error } = await q.range(rangeStart, rangeStart + pageSize - 1)
     if (error) return toast.error(error.message)
     setVehiculos(data || [])
-  }
+    setTotal(count || 0)
+  }, [page, search])
 
-  const filtered = vehiculos.filter(v =>
-    !filter || 
-    (v.placa || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (v.modelo || '').toLowerCase().includes(filter.toLowerCase()) ||
-    (v.marca || '').toLowerCase().includes(filter.toLowerCase())
-  )
+  useEffect(() => { load() }, [load])
+
+  function handleSearchChange(value) {
+    setSearch(value)
+    setPage(1)
+  }
 
   async function handleCreate(e) {
     e.preventDefault()
@@ -208,12 +213,12 @@ export default function VehiculosPage() {
       )}
 
       <div className="relative max-w-xs">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="Buscar por placa, modelo o marca..." value={filter} onChange={e => setFilter(e.target.value.toUpperCase())} className="pl-9" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <Input placeholder="Buscar por placa, modelo o marca..." value={search} onChange={e => handleSearchChange(e.target.value)} className="pl-9" />
       </div>
 
       <div className="space-y-2">
-        {filtered.map(v => (
+        {vehiculos.map(v => (
           <Card key={v.id} className={`p-4 transition-all ${!v.activo ? 'opacity-60 bg-secondary/30' : ''}`}>
             {editId === v.id ? (
               <div className="space-y-3">
@@ -306,8 +311,9 @@ export default function VehiculosPage() {
             )}
           </Card>
         ))}
-        {filtered.length === 0 && <p className="text-center text-muted-foreground py-8">No se encontraron vehículos</p>}
+        {vehiculos.length === 0 && <p className="text-center text-muted-foreground py-8">No se encontraron vehículos</p>}
       </div>
+      <Pagination page={page} totalPages={Math.ceil(total / pageSize)} onPageChange={setPage} />
     </div>
   )
 }

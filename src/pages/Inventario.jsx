@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Package, Search, AlertTriangle, Settings2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -7,48 +7,75 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
-import { normalizeText } from '@/lib/utils'
 import { toast } from 'sonner'
+import Pagination from '@/components/ui/pagination'
 
 export default function InventarioPage() {
   const { institucionId, isSuperAdmin } = useAuth()
   const [items, setItems] = useState([])
-  const [filter, setFilter] = useState('')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [total, setTotal] = useState(0)
+  const pageSize = 20
   const [loading, setLoading] = useState(true)
   const [umbral, setUmbral] = useState(() => {
     return Number(localStorage.getItem('inv_umbral') || 5)
   })
   const [showConfig, setShowConfig] = useState(false)
 
-  useEffect(() => {
-    loadInventario()
-  }, [])
-
-  async function loadInventario() {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
-      let query = supabase
+      let matchingIds = null
+      if (search) {
+        const { data: productos } = await supabase
+          .from('producto')
+          .select('id')
+          .ilike('nombre', `%${search}%`)
+        matchingIds = productos?.map(p => p.id) || []
+        if (matchingIds.length === 0) {
+          setItems([])
+          setTotal(0)
+          setLoading(false)
+          return
+        }
+      }
+
+      let q = supabase
         .from('inventario')
-        .select('*, producto:producto_id (id, nombre, presentacion, categoria_id), institucion:institucion_id (id, nombre)')
+        .select('*, producto:producto_id (id, nombre, presentacion, categoria_id), institucion:institucion_id (id, nombre)', { count: 'exact' })
         .gte('cantidad', 0)
 
       if (!isSuperAdmin && institucionId) {
-        query = query.eq('institucion_id', institucionId)
+        q = q.eq('institucion_id', institucionId)
       }
 
-      const { data } = await query
+      if (matchingIds) {
+        q = q.in('producto_id', matchingIds)
+      }
+
+      q = q.order('created_at', { ascending: false })
+
+      const rangeStart = (page - 1) * pageSize
+      const { data, count } = await q.range(rangeStart, rangeStart + pageSize - 1)
       setItems(data || [])
+      setTotal(count || 0)
     } catch (err) {
     } finally {
       setLoading(false)
     }
+  }, [page, search, isSuperAdmin, institucionId])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  function handleSearchChange(value) {
+    setSearch(value)
+    setPage(1)
   }
 
-  const filtered = items.filter(i => {
-    if (!filter) return true
-    const q = normalizeText(filter)
-    return (i.producto?.nombre || '').includes(q) || (i.institucion?.nombre || '').includes(q)
-  })
+  const totalPages = Math.ceil(total / pageSize)
 
   function handleUmbralChange(val) {
     const n = Number(val)
@@ -72,8 +99,8 @@ export default function InventarioPage() {
 
       <div className="flex flex-wrap gap-3 items-center">
         <div className="relative max-w-xs flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Buscar producto o institución..." value={filter} onChange={e => setFilter(e.target.value.toUpperCase())} className="pl-9" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <Input placeholder="Buscar producto..." value={search} onChange={e => handleSearchChange(e.target.value)} className="pl-9" />
         </div>
       </div>
 
@@ -89,40 +116,43 @@ export default function InventarioPage() {
       {loading ? (
         <p className="text-center text-muted-foreground py-8">Cargando inventario...</p>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((item, idx) => {
-            const cantidad = Number(item.cantidad)
-            return (
-              <Card key={`${item.producto_id}-${item.institucion_id}-${idx}`} className="p-4 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Package className="w-5 h-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{item.producto?.nombre || 'Producto'}</p>
-                  <p className="text-sm text-muted-foreground truncate">{item.institucion?.nombre || '—'}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-xl font-bold tabular-nums">{cantidad.toFixed(0)}</p>
-                  <p className="text-xs text-muted-foreground">{item.producto?.presentacion || 'unidades'}</p>
-                  {item.peso_unitario && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {(cantidad * Number(item.peso_unitario)).toFixed(2)} kg total
-                    </p>
+        <>
+          <div className="space-y-2">
+            {items.map((item, idx) => {
+              const cantidad = Number(item.cantidad)
+              return (
+                <Card key={`${item.producto_id}-${item.institucion_id}-${idx}`} className="p-4 flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Package className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{item.producto?.nombre || 'Producto'}</p>
+                    <p className="text-sm text-muted-foreground truncate">{item.institucion?.nombre || '—'}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-xl font-bold tabular-nums">{cantidad.toFixed(0)}</p>
+                    <p className="text-xs text-muted-foreground">{item.producto?.presentacion || 'unidades'}</p>
+                    {item.peso_unitario && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {(cantidad * Number(item.peso_unitario)).toFixed(2)} kg total
+                      </p>
+                    )}
+                  </div>
+                  {cantidad <= umbral && (
+                    <Badge variant="warning" className="gap-1 shrink-0">
+                      <AlertTriangle className="w-3 h-3" />
+                      Stock bajo
+                    </Badge>
                   )}
-                </div>
-                {cantidad <= umbral && (
-                  <Badge variant="warning" className="gap-1 shrink-0">
-                    <AlertTriangle className="w-3 h-3" />
-                    Stock bajo
-                  </Badge>
-                )}
-              </Card>
-            )
-          })}
-          {filtered.length === 0 && (
-            <p className="text-center text-muted-foreground py-8">No hay productos en inventario</p>
-          )}
-        </div>
+                </Card>
+              )
+            })}
+            {items.length === 0 && (
+              <p className="text-center text-muted-foreground py-8">No se encontraron productos</p>
+            )}
+          </div>
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} className="mt-6" />
+        </>
       )}
     </div>
   )
