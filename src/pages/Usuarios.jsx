@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react'
-import { Users, UserPlus, ShieldCheck, Shield, User, Pencil, X, Check, ToggleLeft, ToggleRight, Eye, EyeOff, AlertCircle, KeyRound } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Users, UserPlus, Search, ShieldCheck, Shield, User, Pencil, X, Check, ToggleLeft, ToggleRight, Eye, EyeOff, AlertCircle, KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { SearchSelect } from '@/components/ui/search-select'
+import Pagination from '@/components/ui/pagination'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { getInstituciones } from '@/lib/api'
@@ -30,6 +31,11 @@ export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([])
   const [instituciones, setInstituciones] = useState([])
   const [showForm, setShowForm] = useState(false)
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [total, setTotal] = useState(0)
+  const [loadingList, setLoadingList] = useState(false)
+  const pageSize = 20
   
   // Estado de edición principal
   const [editId, setEditId] = useState(null)
@@ -129,14 +135,30 @@ export default function UsuariosPage() {
     }
   }
 
-  useEffect(() => { loadUsuarios(); loadInstituciones() }, [])
+  const loadUsuarios = useCallback(async () => {
+    setLoadingList(true)
+    let q = supabase
+      .from('usuarios')
+      .select('*, institucion:institucion_id (nombre)', { count: 'exact' })
 
-  async function loadUsuarios() {
-    let q = supabase.from('usuarios').select('*, institucion:institucion_id (nombre)').order('nombre')
     if (!isSuperAdmin && userInstId) q = q.eq('institucion_id', userInstId)
-    const { data } = await q
+
+    if (search) {
+      q = q.or(`nombre.ilike.%${search}%,apellido.ilike.%${search}%,username.ilike.%${search}%,cedula.ilike.%${search}%`)
+    }
+
+    q = q.order('nombre')
+
+    const rangeStart = (page - 1) * pageSize
+    const { data, count, error } = await q.range(rangeStart, rangeStart + pageSize - 1)
+    if (error) toast.error(error.message)
     setUsuarios(data || [])
-  }
+    setTotal(count || 0)
+    setLoadingList(false)
+  }, [page, search, isSuperAdmin, userInstId])
+
+  useEffect(() => { loadUsuarios() }, [loadUsuarios])
+  useEffect(() => { loadInstituciones() }, [])
 
   async function loadInstituciones() {
     const insts = await getInstituciones()
@@ -485,9 +507,14 @@ export default function UsuariosPage() {
     </div>
   )
 
+  function handleSearchChange(value) {
+    setSearch(value)
+    setPage(1)
+  }
+
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Usuarios</h1>
           <p className="text-sm text-muted-foreground mt-1">Gestión de usuarios del sistema</p>
@@ -506,6 +533,17 @@ export default function UsuariosPage() {
         >
           <UserPlus className="w-4 h-4" /> {showForm ? 'Cerrar' : 'Nuevo'}
         </Button>
+      </div>
+
+      {/* Búsqueda */}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <Input
+          value={search}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          placeholder="Buscar por nombre, usuario o cédula..."
+          className="pl-9"
+        />
       </div>
 
       {showForm && (
@@ -581,8 +619,14 @@ export default function UsuariosPage() {
             </Card>
           )
         })}
-        {usuarios.length === 0 && <p className="text-center text-muted-foreground py-8">No hay usuarios</p>}
+        {loadingList ? (
+          <p className="text-center text-muted-foreground py-8">Cargando...</p>
+        ) : usuarios.length === 0 ? (
+          <p className="text-center text-muted-foreground py-8">No se encontraron usuarios</p>
+        ) : null}
       </div>
+
+      <Pagination page={page} totalPages={Math.ceil(total / pageSize)} onPageChange={setPage} />
     </div>
   )
 }
