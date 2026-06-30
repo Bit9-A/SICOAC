@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { LogIn, UserPlus, ScanLine, Clock } from 'lucide-react'
+import { LogIn, UserPlus, ScanLine, Clock, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -31,6 +31,10 @@ export default function Login({ onLogin, defaultInstitucionId }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // Estados para alternar la visibilidad de las contraseñas
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
   const DIAS = [
     { key: 'L', label: 'Lun' }, { key: 'M', label: 'Mar' }, { key: 'MI', label: 'Mie' },
     { key: 'J', label: 'Jue' }, { key: 'V', label: 'Vie' }, { key: 'S', label: 'Sab' },
@@ -59,10 +63,8 @@ export default function Login({ onLogin, defaultInstitucionId }) {
     return operador
   }
 
-  // El ID de institución a usar (viene de QR o prop)
   const effectiveInstId = localInstId || defaultInstitucionId
 
-  // Cargar datos de la institución (vía QR o prop)
   useEffect(() => {
     if (effectiveInstId) {
       getInstituciones().then(insts => {
@@ -73,7 +75,6 @@ export default function Login({ onLogin, defaultInstitucionId }) {
     }
   }, [effectiveInstId])
 
-  // QR detectado desde el escáner
   function handleQrDetected(code) {
     setShowScanner(false)
     try {
@@ -94,17 +95,35 @@ export default function Login({ onLogin, defaultInstitucionId }) {
   async function handleLogin(e) {
     e.preventDefault()
     setError('')
+    
     if (!username.trim() || !password) {
+      toast.warning('Campos incompletos', {
+        description: 'Por favor, escribe tu usuario y contraseña para ingresar.',
+      })
       setError('Completa usuario y contraseña')
       return
     }
+    
     setLoading(true)
     try {
       await signIn({ username: username.trim(), password })
       toast.success(`Bienvenido, ${username}`)
       onLogin?.()
     } catch (err) {
-      setError(err.message || 'Error al iniciar sesión')
+      if (err.message?.includes('Invalid login credentials') || err.status === 400) {
+        const msgError = 'El usuario o la contraseña son incorrectos. Verifica e intenta de nuevo.'
+        setError(msgError)
+        
+        // Notificación flotante notable con sonner
+        toast.error('Error de acceso', {
+          description: msgError,
+          duration: 5000,
+        })
+      } else {
+        const msgGenerico = err.message || 'Error al iniciar sesión'
+        setError(msgGenerico)
+        toast.error('Error de inicio de sesión', { description: msgGenerico })
+      }
     } finally {
       setLoading(false)
     }
@@ -133,7 +152,6 @@ export default function Login({ onLogin, defaultInstitucionId }) {
       const instId = effectiveInstId || null
       const normUsername = username.trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
-      // Verificar username único
       const { data: exist } = await supabase.from('usuarios').select('id').eq('username', normUsername).maybeSingle()
       if (exist) { setError('El nombre de usuario ya está registrado'); setLoading(false); return }
 
@@ -169,7 +187,6 @@ export default function Login({ onLogin, defaultInstitucionId }) {
         {/* Logo */}
         <div className="text-center space-y-3">
           <div className="inline-flex items-center justify-center w-16 h-14 rounded-2xl bg-primary/10">
-            {/* <Package className="w-8 h-8 text-primary" /> */}
             <img src="/logo_sicoac.png" alt="Logo SICOAC" />
           </div>
           <h1 className="text-xl font-bold">Centros de Acopio</h1>
@@ -193,13 +210,23 @@ export default function Login({ onLogin, defaultInstitucionId }) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="login-pass">Contraseña</Label>
-                <Input
-                  id="login-pass"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+                <div className="relative">
+                  <Input
+                    id="login-pass"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               {error && <p className="text-sm text-destructive">{error}</p>}
@@ -213,7 +240,7 @@ export default function Login({ onLogin, defaultInstitucionId }) {
                 ¿No tienes cuenta?{' '}
                 <button
                   type="button"
-                  onClick={() => { setMode('register'); setError('') }}
+                  onClick={() => { setMode('register'); setError(''); setShowPassword(false); }}
                   className="text-primary hover:underline font-medium"
                 >
                   Regístrate
@@ -239,7 +266,7 @@ export default function Login({ onLogin, defaultInstitucionId }) {
                 ¿Ya tienes cuenta?{' '}
                 <button
                   type="button"
-                  onClick={() => { setMode('login'); setError('') }}
+                  onClick={() => { setMode('login'); setError(''); setShowPassword(false); }}
                   className="text-primary hover:underline font-medium"
                 >
                   Iniciar sesión
@@ -322,13 +349,49 @@ export default function Login({ onLogin, defaultInstitucionId }) {
                 <Label htmlFor="reg-user">Usuario <span className="text-destructive">*</span></Label>
                 <Input id="reg-user" placeholder="ej: mariaperez" value={username} onChange={(e) => setUsername(e.target.value)} autoFocus />
               </div>
+              
+              {/* Contraseña Registro */}
               <div className="space-y-2">
                 <Label htmlFor="reg-pass">Contraseña <span className="text-destructive">*</span></Label>
-                <Input id="reg-pass" type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={(e) => setPassword(e.target.value)} />
+                <div className="relative">
+                  <Input
+                    id="reg-pass"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Mínimo 6 caracteres"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
+
+              {/* Confirmar Contraseña Registro */}
               <div className="space-y-2">
                 <Label htmlFor="reg-confirm">Confirmar contraseña <span className="text-destructive">*</span></Label>
-                <Input id="reg-confirm" type="password" placeholder="Repite la contraseña" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+                <div className="relative">
+                  <Input
+                    id="reg-confirm"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Repite la contraseña"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               {error && <p className="text-sm text-destructive">{error}</p>}
@@ -342,7 +405,7 @@ export default function Login({ onLogin, defaultInstitucionId }) {
                 ¿Ya tienes cuenta?{' '}
                 <button
                   type="button"
-                  onClick={() => { setMode('login'); setError('') }}
+                  onClick={() => { setMode('login'); setError(''); setShowPassword(false); setShowConfirmPassword(false); }}
                   className="text-primary hover:underline font-medium"
                 >
                   Iniciar sesión
