@@ -349,16 +349,14 @@ export default function ProductosPage() {
                     <p className="font-medium truncate">{p.nombre}</p>
                     <p className="text-sm text-muted-foreground truncate">{p.descripcion || '—'}</p>
                     {(p.producto_codigo || []).length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-1">
-                        {(p.producto_codigo || []).slice(0, 4).map(bc => (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        <span className="text-xs text-muted-foreground mr-0.5">Códigos:</span>
+                        {(p.producto_codigo || []).map(bc => (
                           <span key={bc.id} className="inline-flex items-center gap-1 text-xs bg-secondary/60 px-1.5 py-0.5 rounded">
                             <Barcode className="w-2.5 h-2.5" />
                             {bc.codigo}
                           </span>
                         ))}
-                        {(p.producto_codigo || []).length > 4 && (
-                          <span className="text-xs text-muted-foreground">+{p.producto_codigo.length - 4}</span>
-                        )}
                       </div>
                     )}
                   </div>

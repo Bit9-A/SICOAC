@@ -300,6 +300,29 @@ export async function sendRecord(record) {
     existingProduct = await findProductByBarcode(record.barcode)
   }
 
+  // Si el código no está registrado pero el producto ya existe por nombre,
+  // asociar el nuevo código al producto existente (múltiples códigos por producto)
+  if (!existingProduct && record.productName) {
+    const { data: prodByName } = await supabase
+      .from('producto')
+      .select('id, nombre')
+      .eq('nombre', normalizeText(record.productName))
+      .maybeSingle()
+
+    if (prodByName) {
+      existingProduct = { id: prodByName.id, productName: prodByName.nombre }
+
+      if (record.barcode) {
+        const { error: codeErr } = await supabase
+          .from('producto_codigo')
+          .insert([{ producto_id: prodByName.id, codigo: record.barcode.trim() }])
+        if (codeErr && !codeErr.message?.includes('duplicate')) {
+          throw codeErr
+        }
+      }
+    }
+  }
+
   if (existingProduct) {
     finalProductId = existingProduct.id
     const { error: updErr } = await supabase
