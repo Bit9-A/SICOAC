@@ -29,16 +29,18 @@ alter table public.usuarios alter column rol set default 'operador';
 do $$ declare
   r record;
 begin
-  -- Eliminar cualquier FK que apunte a una tabla 'rol' que no existe
+  -- Eliminar cualquier FK sobre la columna 'rol' de usuarios
   for r in (
     select con.conname
     from pg_constraint con
     join pg_class cls on cls.oid = con.conrelid
+    join pg_attribute att on att.attrelid = con.conrelid
+      and att.attnum = any(con.conkey)
     where cls.relname = 'usuarios'
-    and con.confrelid > 0
-    and con.confrelid in (select oid from pg_class where relname = 'rol')
+      and att.attname = 'rol'
+      and con.contype = 'f'
   ) loop
-    execute 'alter table public.usuarios drop constraint ' || r.conname;
+    execute format('alter table public.usuarios drop constraint if exists %I', r.conname);
   end loop;
 end $$;
 
