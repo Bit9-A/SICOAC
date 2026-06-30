@@ -35,8 +35,7 @@ const NAV_ITEMS = {
   ],
 }
 
-export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpenScan, user, profile }) {
-  const [collapsed, setCollapsed] = useState(false)
+export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpenScan, user, profile, collapsed, setCollapsed }) {
   const collapsedRef = useRef(collapsed)
   const touchStartRef = useRef(null)
   const [showUserMenu, setShowUserMenu] = useState(false)

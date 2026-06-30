@@ -56,6 +56,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
   const [subcategoriaId, setSubcategoriaId] = useState('')
   const [presentation, setPresentation] = useState('')
   const [quantity, setQuantity] = useState('')
+  const [weight, setWeight] = useState('')
 
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState({})
@@ -156,6 +157,15 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
           setPresentation(prod.presentation || '')
           toast.info(`Producto autocompletado: ${prod.productName}`)
           setTimeout(() => quantityRef.current?.focus(), 100)
+        } else {
+          // Código no registrado — limpia campos del producto anterior
+          setProduct('')
+          setDescription('')
+          setCategoryId('')
+          setSubcategoriaId('')
+          setPresentation('')
+          setQuantity('')
+          setWeight('')
         }
       })
     }
@@ -254,6 +264,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
         productName: normalizeText(product),
         description: normalizeText(description),
         quantity: qty,
+        peso_unitario: weight ? Number(weight) : null,
         categoryId,
         subcategoriaId: subcategoriaId || null,
         presentation: presentation || 'unidades',
@@ -278,7 +289,9 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
         institucionDestinoId: null,
         tipoMovimiento: 'Entrada',
         barcode: barcode.trim(), productName: normalizeText(product),
-        description: normalizeText(description), quantity: qty, categoryId,
+        description: normalizeText(description), quantity: qty,
+        peso_unitario: weight ? Number(weight) : null,
+        categoryId,
         subcategoriaId: subcategoriaId || null,
         presentation: presentation || 'unidades',
       })
@@ -292,7 +305,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
   function resetForm() {
     setBarcode(''); setBarcodeOptions([])
     setProduct(''); setProductOptions([])
-    setDescription(''); setCategoryId(''); setSubcategoriaId(''); setPresentation(''); setQuantity('')
+    setDescription(''); setCategoryId(''); setSubcategoriaId(''); setPresentation(''); setQuantity(''); setWeight('')
     setErrors({})
     if (!isSuperAdmin) {
       setStep(2)
@@ -464,7 +477,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="quantity">Cantidad <span className="text-destructive">*</span></Label>
+                <Label htmlFor="quantity">Cantidad por bulto/caja <span className="text-destructive">*</span></Label>
                 <Input
                   id="quantity"
                   ref={quantityRef}
@@ -484,6 +497,20 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
                   className={errors.quantity ? 'border-destructive' : ''}
                 />
                 {errors.quantity && <p className="text-xs text-destructive">{errors.quantity}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="weight">Peso unitario (kg)</Label>
+                <Input
+                  id="weight"
+                  type="number"
+                  min="0"
+                  step="any"
+                  inputMode="decimal"
+                  placeholder="Ej: 2.5"
+                  value={weight}
+                  onChange={e => setWeight(e.target.value)}
+                />
               </div>
 
               <div className="space-y-2">
