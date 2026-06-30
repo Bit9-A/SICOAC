@@ -124,11 +124,27 @@ export async function getParroquias(municipioId) {
 }
 
 export async function getInstituciones() {
-  const { data, error } = await supabase.from('institucion').select('id, nombre, direccion, parroquia_id').order('nombre')
+  const { data, error } = await supabase
+    .from('institucion')
+    .select('id, nombre, direccion, parroquia_id, parroquia:parroquia_id (id, nombre, municipio:municipio_id (id, nombre, estado_id))')
+    .order('nombre')
   if (error) {
     throw error
   }
-  return data.map((i) => ({ value: i.id, label: i.nombre, direccion: i.direccion, parroquiaId: i.parroquia_id }))
+  return data.map((i) => {
+    const p = i.parroquia
+    const m = p?.municipio
+    return {
+      value: i.id,
+      label: i.nombre,
+      direccion: i.direccion,
+      parroquiaId: i.parroquia_id,
+      parroquiaNombre: p?.nombre || '',
+      municipioId: m?.id || null,
+      municipioNombre: m?.nombre || '',
+      estadoId: m?.estado_id || null,
+    }
+  })
 }
 
 export async function createInstitucion(nombre, direccion, parroquiaId) {
