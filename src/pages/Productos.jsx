@@ -177,7 +177,7 @@ export default function ProductosPage() {
 
       <div className="relative max-w-xs">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="Buscar producto..." value={filter} onChange={e => setFilter(e.target.value)} className="pl-9" />
+        <Input placeholder="Buscar producto..." value={filter} onChange={e => setFilter(e.target.value.toUpperCase())} className="pl-9" />
       </div>
 
       <div className="space-y-2">
@@ -188,11 +188,11 @@ export default function ProductosPage() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Nombre</Label>
-                    <Input value={editNombre} onChange={e => setEditNombre(e.target.value)} />
+                    <Input value={editNombre} onChange={e => setEditNombre(e.target.value.toUpperCase())} />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Descripción</Label>
-                    <Input value={editDesc} onChange={e => setEditDesc(e.target.value)} />
+                    <Input value={editDesc} onChange={e => setEditDesc(e.target.value.toUpperCase())} />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Categoría</Label>
