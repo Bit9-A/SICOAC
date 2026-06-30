@@ -2,17 +2,51 @@
 -- CREAR SUPER ADMIN
 -- Usuario: admin | Contraseña: admin123
 --
--- Ejecutar en el SQL Editor de Supabase.
+-- Arregla la tabla usuarios (agrega columnas faltantes),
+-- crea el trigger de perfil automático, y crea el superadmin.
 -- ============================================================
 
--- 0. Asegurar que la columna rol sea text (en la DB actual puede ser integer)
-alter table public.usuarios drop constraint if exists usuarios_rol_check;
+-- 1. Arreglar tabla usuarios: agregar columnas faltantes si no existen
+do $$ begin
+  if not exists (select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'usuarios' and column_name = 'rol')
+  then
+    alter table public.usuarios add column rol text not null default 'operador';
+  end if;
+
+  if not exists (select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'usuarios' and column_name = 'activo')
+  then
+    alter table public.usuarios add column activo boolean not null default true;
+  end if;
+end $$;
+
+-- 2. Asegurar tipo de columna rol
 alter table public.usuarios alter column rol type text using rol::text;
 alter table public.usuarios alter column rol set default 'operador';
+
+-- 3. Limpiar constraints viejos y asegurar check constraint
+do $$ declare
+  r record;
+begin
+  -- Eliminar cualquier FK que apunte a una tabla 'rol' que no existe
+  for r in (
+    select con.conname
+    from pg_constraint con
+    join pg_class cls on cls.oid = con.conrelid
+    where cls.relname = 'usuarios'
+    and con.confrelid > 0
+    and con.confrelid in (select oid from pg_class where relname = 'rol')
+  ) loop
+    execute 'alter table public.usuarios drop constraint ' || r.conname;
+  end loop;
+end $$;
+
+alter table public.usuarios drop constraint if exists usuarios_rol_check;
 alter table public.usuarios add constraint usuarios_rol_check
   check (rol in ('super_admin', 'admin', 'operador'));
 
--- 1. Asegurar que existe el trigger para crear perfiles automáticos
+-- 4. Asegurar que existe el trigger para crear perfiles automáticos
 create or replace function public.handle_new_user()
 returns trigger
 security definer
@@ -39,8 +73,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- 2. Crear el usuario en auth.users con contraseña encriptada
--- La contraseña 'admin123' encriptada con bcrypt
+-- 5. Crear el usuario en auth.users
 insert into auth.users (
   instance_id, id, aud, role,
   email, encrypted_password, email_confirmed_at,
@@ -63,7 +96,7 @@ insert into auth.users (
   '', '', '', ''
 );
 
--- 3. Crear identities (necesario para que el usuario pueda iniciar sesión)
+-- 6. Crear identities (necesario para login)
 insert into auth.identities (
   id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
 )
@@ -74,12 +107,11 @@ select
 from auth.users
 where email = 'admin@sicoac.com'
   and not exists (
-    select 1 from auth.identities where provider = 'email' and user_id = auth.users.id
+    select 1 from auth.identities
+    where provider = 'email' and user_id = auth.users.id
   );
 
--- 4. Verificar que el perfil se creó en public.usuarios
--- (el trigger handle_new_user lo crea automáticamente al insertar en auth.users)
--- Si no se creó automáticamente, insertarlo manualmente:
+-- 7. Insertar perfil en public.usuarios si el trigger no lo hizo
 insert into public.usuarios (id, username, nombre, apellido, rol, activo)
 select id, 'admin', 'Super', 'Admin', 'super_admin', true
 from auth.users
