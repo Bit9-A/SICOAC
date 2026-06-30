@@ -4,6 +4,7 @@ import { verifyAdmin } from '../_shared/admin-auth.ts'
 
 interface UpdateUserPayload {
   user_id: string
+  username?: string
   nombre?: string
   apellido?: string
   telefono?: string
@@ -61,8 +62,21 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: 'Solo super_admin puede asignar este rol' }, 403)
     }
 
+    // Si cambia el username, actualizar también el email en Auth
+    if (body.username !== undefined) {
+      const newEmail = `${body.username.toLowerCase().trim()}@acopio.app`
+      const { error: authUpdateError } = await supabaseAdmin.auth.admin.updateUserById(
+        body.user_id,
+        { email: newEmail }
+      )
+      if (authUpdateError) {
+        return jsonResponse({ error: `Error al actualizar email en Auth: ${authUpdateError.message}` }, 500)
+      }
+    }
+
     // Construir objeto de actualización para public.usuarios
     const profileUpdate: Record<string, unknown> = {}
+    if (body.username !== undefined) profileUpdate.username = body.username.toUpperCase().trim()
     if (body.nombre !== undefined) profileUpdate.nombre = body.nombre.trim()
     if (body.apellido !== undefined) profileUpdate.apellido = body.apellido.trim()
     if (body.telefono !== undefined) profileUpdate.telefono = body.telefono.trim()

@@ -10,7 +10,7 @@ import Pagination from '@/components/ui/pagination'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { getInstituciones } from '@/lib/api'
-import { signUp } from '@/lib/auth' 
+import { adminCreateUser, adminResetPassword, adminUpdateUser } from '@/lib/admin-api'
 import { cn, normalizeText } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -226,25 +226,16 @@ export default function UsuariosPage() {
       const { data: existCed } = await supabase.from('usuarios').select('id').eq('cedula', cedulaCompleta).maybeSingle()
       if (existCed) { setErrors(p => ({ ...p, cedula: 'La cédula pertenece a otro usuario' })); setLoading(false); return }
 
-      await signUp({ 
-        username: normUsername, 
-        password, 
-        nombre: normNombre, 
-        apellido: normApellido, 
-        telefono: normTel, 
-        rol, 
-        institucionId: instId || null,
-        cedula: cedulaCompleta
+      await adminCreateUser({
+        username: normUsername,
+        password,
+        nombre: normNombre,
+        apellido: normApellido,
+        telefono: normTel,
+        rol,
+        institucion_id: instId || null,
+        cedula: cedulaCompleta,
       })
-
-      const { error: patchError } = await supabase
-        .from('usuarios')
-        .update({ cedula: cedulaCompleta })
-        .eq('username', normUsername)
-
-      if (patchError) {
-        console.error("Error guardando la cédula:", patchError.message)
-      }
       
       toast.success('Usuario creado con éxito')
       setShowForm(false)
@@ -285,22 +276,20 @@ export default function UsuariosPage() {
       const { data: exist } = await supabase.from('usuarios').select('id').eq('username', normUsername).neq('id', id).maybeSingle()
       if (exist) { setErrors({ username: 'El nombre de usuario ya existe' }); setLoading(false); return }
 
-      if (password) {
-        const { error: authError } = await supabase.auth.updateUser({ password: password })
-        if (authError) console.warn("Nota RLS/Auth: No se pudo cambiar la contraseña vía SDK", authError.message)
-      }
-
-      const updateData = {
+      // Actualizar perfil vía Edge Function (respeta roles y permisos)
+      await adminUpdateUser(id, {
+        username: normUsername,
         nombre: normNombre,
         apellido: normApellido,
-        username: normUsername,
         telefono: normTel,
         rol,
-        institucion_id: instId || null
-      }
+        institucion_id: instId ? Number(instId) : null,
+      })
 
-      const { error } = await supabase.from('usuarios').update(updateData).eq('id', id)
-      if (error) throw error
+      // Si se especificó nueva contraseña, resetear vía Edge Function
+      if (password) {
+        await adminResetPassword(id, password)
+      }
 
       toast.success('Usuario actualizado con éxito')
       resetForm()
@@ -313,13 +302,19 @@ export default function UsuariosPage() {
   }
 
   async function handleToggleActive(id, activo) {
-    const { error } = await supabase.from('usuarios').update({ activo: !activo }).eq('id', id)
-    if (error) return toast.error(error.message)
-    toast.success(activo ? 'Usuario desactivado' : 'Usuario activado')
-    loadUsuarios()
+    setLoading(true)
+    try {
+      await adminUpdateUser(id, { activo: !activo })
+      toast.success(activo ? 'Usuario desactivado' : 'Usuario activado')
+      loadUsuarios()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // Nueva función para restablecer la contraseña al mismo username
+  // Restablecer contraseña al username del usuario (Edge Function con service_role)
   async function handleResetPassword(userRaw) {
     const defaultPassword = userRaw.username.toLowerCase().trim()
     
@@ -329,15 +324,10 @@ export default function UsuariosPage() {
 
     setLoading(true)
     try {
-      // Nota: Desde Supabase Client estándar, updateUser aplica sobre la sesión actual. 
-      // Si eres Super Admin administrando terceros, lo ideal es usar una Edge Function o supabase.auth.admin.updateUserById desde un backend/RPC.
-      const { error } = await supabase.auth.updateUser({ password: defaultPassword })
-      
-      if (error) throw error
+      await adminResetPassword(userRaw.id, defaultPassword)
       toast.success(`Contraseña restablecida con éxito. Nueva clave: "${defaultPassword}"`)
     } catch (err) {
-      console.error(err)
-      toast.error(`No se pudo actualizar en Auth: ${err.message}. Asegúrate de tener los permisos necesarios.`)
+      toast.error(err.message)
     } finally {
       setLoading(false)
     }
