@@ -71,7 +71,6 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
   const subcategoriasPorCat = (catId) =>
     catId ? subcategorias.filter(s => String(s.categoriaId) === String(catId)) : []
 
-  // Load initial options
   useEffect(() => {
     async function load() {
       const [ests, insts, cats, subs] = await Promise.all([
@@ -82,7 +81,6 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
       setCategorias(cats)
       setSubcategorias(subs)
 
-      // Auto-select institution del usuario (operador o admin)
       if (userInstId) {
         const userInst = insts.find(i => String(i.value) === String(userInstId))
         if (userInst) {
@@ -97,7 +95,6 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
 
   async function loadGeo(parroquiaId) {
     try {
-      // 1. Traer la parroquia
       const { data: parroquia } = await supabase
         .from('parroquia')
         .select('id, municipio_id')
@@ -105,7 +102,6 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
         .single()
       if (!parroquia) return
 
-      // 2. Traer el municipio (con su estado_id)
       const { data: municipio } = await supabase
         .from('municipio')
         .select('id, estado_id')
@@ -113,7 +109,6 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
         .single()
       if (!municipio) return
 
-      // 3. Cargar los selects en cascada
       setEstadoId(municipio.estado_id)
       const muns = await getMunicipios(municipio.estado_id)
       setMunicipios(muns)
@@ -121,12 +116,11 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
       const parqs = await getParroquias(parroquia.municipio_id)
       setParroquias(parqs)
       setParroquiaId(parroquia.id)
-    } catch (err) { /* ignore */ }
+    } catch (err) { }
   }
 
-  // Búsqueda async de códigos de barras
   const handleBarcodeSearch = useCallback(async (query) => {
-    setBarcode(query) // tracking del texto aunque no haya selección
+    setBarcode(query)
     if (!query || query.trim().length < 2) { setBarcodeOptions([]); return }
     setBarcodeSearching(true)
     try {
@@ -135,7 +129,6 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     } finally { setBarcodeSearching(false) }
   }, [])
 
-  // Selección de un resultado del dropdown de código
   const handleBarcodeChange = useCallback((val) => {
     setBarcode(val)
     const found = barcodeOptions.find(o => o.value === val)
@@ -150,12 +143,10 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     }
   }, [barcodeOptions])
 
-  // Si viene un código escaneado, hacer la búsqueda inicial
   useEffect(() => {
     if (initialBarcode) {
       setBarcode(initialBarcode)
       handleBarcodeSearch(initialBarcode)
-      // Búsqueda exacta para auto-completar
       findProductByBarcode(initialBarcode).then(prod => {
         if (prod) {
           setProduct(prod.productName)
@@ -170,7 +161,6 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     }
   }, [initialBarcode])
 
-  // Búsqueda async de productos por nombre
   const handleProductSearch = useCallback(async (query) => {
     if (!query || query.trim().length < 2) { setProductOptions([]); return }
     setProductSearching(true)
@@ -180,7 +170,6 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     } finally { setProductSearching(false) }
   }, [])
 
-  // Selección de producto desde el dropdown
   const handleProductChange = useCallback((val) => {
     const found = productOptions.find(o => o.value === val)
     if (found) {
@@ -194,12 +183,11 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     }
   }, [productOptions])
 
-  /* Handlers */
   const handleSelectInstitucion = async (id) => {
     setInstitucionId(id)
     setErrors({})
     if (id === 'new' || isOperator) return
-    const inst = instituciones.find(i => String(i.value) === String(id))
+    const inst = instituciones.find(i => String(i.value.to) === String(id))
     if (!inst) return
     setDireccion(inst.direccion || '')
     if (inst.parroquiaId) loadGeo(inst.parroquiaId)
@@ -207,7 +195,7 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
 
   const handleCreateInstitucion = async (name) => {
     setInstitucionId('new')
-    setNewInstitucionNombre(normalizeText(name))
+    setNewInstitucionNombre(name.toUpperCase())
     setDireccion(''); setEstadoId(''); setMunicipioId(''); setParroquiaId('')
     setMunicipios([]); setParroquias([])
     return { value: 'new', label: name }
@@ -257,11 +245,9 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
 
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); toast.warning('Corrige los campos marcados'); return }
 
-    // Validar stock antes de salida/transferencia
     if ((isSalida || isTransfer) && !isNaN(qty) && qty > 0) {
       const instId = isTransfer ? institucionOrigenId : institucionId
       if (instId && barcodeOptions.length > 0) {
-        // Buscar el productoId desde barcodeOptions o productOptions
         let prodId = null
         const barcFound = barcodeOptions.find(o => o.value === barcode)
         if (barcFound) prodId = barcFound.productId
@@ -362,7 +348,6 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
     <div className="flex flex-col min-h-full px-4 py-4 md:py-6 lg:py-8 bg-background">
       <div className="w-full max-w-xl mx-auto space-y-6">
 
-        {/* Header */}
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={() => step === 1 ? onBack() : setStep(1)}>
             <ArrowLeft className="w-5 h-5" />
@@ -385,7 +370,6 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
           </p>
         </div>
 
-        {/* Step 1 — Institution (admin only) */}
         {!isOperator && step === 1 && (
           <Card className="p-4 md:p-5 space-y-4">
             <div className="flex items-center gap-2 border-b border-border/50 pb-2">
@@ -412,6 +396,14 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
 
             {isNewInstitution && (
               <>
+                <div className="space-y-2">
+                  <Label>Nombre de la Institución *</Label>
+                  <Input 
+                    value={newInstitucionNombre} 
+                    onChange={e => setNewInstitucionNombre(e.target.value.toUpperCase())} 
+                    placeholder="Ej: CENTRO DE ACOPIO CARACAS"
+                  />
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="space-y-2">
                     <Label>Estado *</Label>
@@ -445,11 +437,9 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
           </Card>
         )}
 
-        {/* Step 2 — Form (operator starts here) */}
         {step === 2 && (
           <form onSubmit={handleSubmit} className="space-y-6">
 
-            {/* Institution summary / Transferencia selects */}
             {tipoMovimiento === 'Transferencia' ? (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -486,7 +476,6 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
               </Card>
             )}
 
-            {/* Movement type */}
             <Card className="p-4 md:p-5 space-y-4">
               <div className="flex items-center gap-2 border-b border-border/50 pb-2">
                 <ArrowDownCircle className="w-5 h-5 text-primary" />
@@ -513,7 +502,6 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
               )}
             </Card>
 
-            {/* Product info */}
             <Card className="p-4 md:p-5 space-y-4">
               <div className="flex items-center gap-2 border-b border-border/50 pb-2">
                 <ShoppingBag className="w-5 h-5 text-primary" />
