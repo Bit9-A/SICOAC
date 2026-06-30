@@ -105,12 +105,12 @@ insert into auth.users (
 
 -- 6. Crear identities (necesario para login)
 insert into auth.identities (
-  id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+  id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at
 )
 select
   id, id,
   format('{"sub":"%s","email":"%s"}', id::text, 'admin@sicoac.com')::jsonb,
-  'email', now(), now(), now()
+  'email', 'admin@sicoac.com', now(), now(), now()
 from auth.users
 where email = 'admin@sicoac.com'
   and not exists (
