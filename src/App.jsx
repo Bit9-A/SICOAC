@@ -104,6 +104,8 @@ function AppContent() {
       onNavigate={handleNavigate}
       onLogout={handleLogout}
       onOpenScan={openScan}
+      user={user}
+      profile={profile}
     >
       {/* Home — todos los roles */}
       {page === 'home' && (

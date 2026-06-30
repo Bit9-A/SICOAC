@@ -1,7 +1,7 @@
 import Sidebar from './Sidebar'
 
 export default function AppLayout({
-  rol, currentPage, onNavigate, onLogout, onOpenScan, children
+  rol, currentPage, onNavigate, onLogout, onOpenScan, user, profile, children
 }) {
   const isOperator = rol === 'operador'
 
@@ -25,6 +25,8 @@ export default function AppLayout({
         onNavigate={onNavigate}
         onLogout={onLogout}
         onOpenScan={onOpenScan}
+        user={user}
+        profile={profile}
       />
       <main className="flex-1 overflow-y-auto overflow-x-hidden">
         {children}
