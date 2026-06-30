@@ -92,7 +92,7 @@ insert into auth.users (
   gen_random_uuid(),
   'authenticated',
   'authenticated',
-  'admin@sicoac.com',
+  'admin@acopio.app',
   extensions.crypt('admin123', extensions.gen_salt('bf')),
   now(),
   '{"provider":"email","providers":["email"]}',
@@ -109,10 +109,10 @@ insert into auth.identities (
 )
 select
   id, id,
-  format('{"sub":"%s","email":"%s"}', id::text, 'admin@sicoac.com')::jsonb,
-  'email', 'admin@sicoac.com', now(), now(), now()
+  format('{"sub":"%s","email":"%s"}', id::text, 'admin@acopio.app')::jsonb,
+  'email', 'admin@acopio.app', now(), now(), now()
 from auth.users
-where email = 'admin@sicoac.com'
+where email = 'admin@acopio.app'
   and not exists (
     select 1 from auth.identities
     where provider = 'email' and user_id = auth.users.id
@@ -122,6 +122,6 @@ where email = 'admin@sicoac.com'
 insert into public.usuarios (id, username, nombre, apellido, rol, activo)
 select id, 'admin', 'Super', 'Admin', 'super_admin', true
 from auth.users
-where email = 'admin@sicoac.com'
+where email = 'admin@acopio.app'
   and not exists (select 1 from public.usuarios where username = 'admin')
 on conflict (id) do nothing;
