@@ -157,6 +157,15 @@ export default function Form({ barcode: initialBarcode, onBack, onScanAgain, onS
           setPresentation(prod.presentation || '')
           toast.info(`Producto autocompletado: ${prod.productName}`)
           setTimeout(() => quantityRef.current?.focus(), 100)
+        } else {
+          // Código no registrado — limpia campos del producto anterior
+          setProduct('')
+          setDescription('')
+          setCategoryId('')
+          setSubcategoriaId('')
+          setPresentation('')
+          setQuantity('')
+          setWeight('')
         }
       })
     }
