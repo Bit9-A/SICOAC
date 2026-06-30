@@ -20,11 +20,6 @@ import VoluntariosPage from '@/pages/Voluntarios'
 import VoluntarioRegistroPage from '@/pages/VoluntarioRegistro'
 import QrRegistroPage from '@/pages/QrRegistro'
 
-// Ruta pública para registro de voluntarios (sin auth)
-if (window.location.pathname === '/voluntario') {
-  return <VoluntarioRegistroPage />
-}
-
 function AppContent() {
   const { user, profile, loading, logout, rol, isOperator, isAdmin } = useAuth()
 
@@ -169,6 +164,11 @@ function AppContent() {
 }
 
 export default function App() {
+  // Ruta pública para registro de voluntarios (sin auth)
+  if (window.location.pathname === '/voluntario') {
+    return <VoluntarioRegistroPage />
+  }
+
   return (
     <AuthProvider>
       <AppContent />
