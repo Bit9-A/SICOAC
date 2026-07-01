@@ -860,7 +860,7 @@ export default function DespachosPage() {
                       <tr key={m.id} className={`font-medium ${guia.estado_entrega === 'Cancelado' ? 'text-slate-400 line-through decoration-red-500' : 'text-slate-800'}`}>
                         <td className="py-2.5 px-3 text-slate-400">{i + 1}</td>
                         <td className="py-2.5 px-3 text-sm">{m.producto?.nombre}</td>
-                        <td className="py-2.5 px-3 text-right font-bold text-base text-slate-900">{NEW.Number(m.cantidad).toFixed(0)}</td>
+                        <td className="py-2.5 px-3 text-right font-bold text-base text-slate-900">{Number(m.cantidad).toFixed(0)}</td>
                         <td className="py-2.5 px-3 text-right text-slate-500 font-normal">{m.unidad}</td>
                       </tr>
                     ))}
