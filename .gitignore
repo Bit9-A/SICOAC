@@ -6,3 +6,6 @@ dist
 .vite
 pnpm-lock.yaml
 pnpm-workspace.yaml
+public/@powersync/
+src/hooks/useSyncStatus.js
+openspec/
