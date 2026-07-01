@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { LogIn, UserPlus, ScanLine, Clock, Eye, EyeOff, AlertCircle } from 'lucide-react'
+import { LogIn, UserPlus, ScanLine, Clock, Eye, EyeOff, AlertCircle, Smartphone } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -253,6 +253,16 @@ export default function Login({ onLogin, defaultInstitucionId }) {
                   Regístrate
                 </button>
               </p>
+
+              <div className="border-t border-border pt-4 text-center">
+                <a
+                  href="/instalar"
+                  className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-1.5"
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  Descargar App Móvil (APK) y Guía
+                </a>
+              </div>
             </form>
           ) : !effectiveInstId ? (
             /* Paso 1: Escanear QR */

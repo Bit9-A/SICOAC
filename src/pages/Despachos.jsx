@@ -18,8 +18,6 @@ import { normalizeText } from '@/lib/utils'
 import Pagination from '@/components/ui/pagination'
 import { toast } from 'sonner'
 import Scanner from '@/pages/Scanner'
-
-// Importamos la librería para conversión a PDF
 import html2pdf from 'html2pdf.js'
 
 export default function DespachosPage() {
@@ -35,11 +33,9 @@ export default function DespachosPage() {
   const [guia, setGuia] = useState(null)
   const [activeTab, setActiveTab] = useState('salidas') 
 
-  // Modales personalizados de confirmación
   const [showDeliveryModal, setShowDeliveryModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
 
-  // Form states
   const [origenId, setOrigenId] = useState(isSuperAdmin ? '' : String(institucionId || ''))
   const [destinoId, setDestinoId] = useState('')
   const [choferId, setChoferId] = useState('')
@@ -104,7 +100,7 @@ export default function DespachosPage() {
     if (error) toast.error('Error al cargar rutas: ' + error.message)
     setDespachos(data || [])
     setTotal(count || 0)
-  }, [page, search, activeTab, origenId, isSuperAdmin, institucionId])
+  }, [page, search, activeTab, isSuperAdmin, institucionId])
 
   useEffect(() => { 
     if (view === 'list') fetchDespachos() 
@@ -306,66 +302,26 @@ export default function DespachosPage() {
     const despachoIdNumerico = Number(guia.id)
     setActionLoading(true)
     try {
-      const { data: tipoEntrada } = await supabase.from('tipo_movimiento').select('id').eq('nombre', 'Entrada').single()
-      if (!tipoEntrada) throw new Error("Tipo de movimiento 'Entrada' no encontrado en el esquema.")
-
-      const { data: movimientos, error: fetchErr } = await supabase
+      // 1. Cambiamos el estado de los movimientos originales a 'cancelado'
+      // El trigger en PostgreSQL (TG_OP = 'UPDATE') sumará el stock al origen de forma automática una sola vez
+      const { error: movsErr } = await supabase
         .from('movimiento')
-        .select('producto_id, institucion_origen_id, institucion_destino_id, cantidad, unidad')
+        .update({ estado: 'cancelado' })
         .eq('despacho_id', despachoIdNumerico)
         .eq('estado', 'enviado')
 
-      if (fetchErr) throw fetchErr
+      if (movsErr) throw movsErr
 
-      if (movimientos && movimientos.length > 0) {
-        const nuevosMovimientosKardex = []
+      // 2. Modificamos el estado del Manifiesto / Despacho general
+      const { error: despErr } = await supabase
+        .from('despacho')
+        .update({ estado_entrega: 'Cancelado' })
+        .eq('id', despachoIdNumerico)
 
-        for (const mov of movimientos) {
-          const { data: currentInv } = await supabase
-            .from('inventario')
-            .select('cantidad')
-            .eq('producto_id', mov.producto_id)
-            .eq('institucion_id', mov.institucion_origen_id)
-            .single()
-
-          const stockPrevio = currentInv ? Number(currentInv.cantidad) : 0
-          const nuevaCantidad = stockPrevio + Number(mov.cantidad)
-
-          const { error: invErr } = await supabase
-            .from('inventario')
-            .upsert({
-              producto_id: mov.producto_id,
-              institucion_id: mov.institucion_origen_id,
-              cantidad: nuevaCantidad,
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'producto_id,institucion_id' })
-
-          if (invErr) throw invErr
-
-          nuevosMovimientosKardex.push({
-            institucion_origen_id: mov.institucion_destino_id, 
-            institucion_destino_id: mov.institucion_origen_id, 
-            tipo_movimiento_id: tipoEntrada.id,
-            estado: 'completado', 
-            created_by: user?.id || null,
-            despacho_id: despachoIdNumerico, 
-            producto_id: mov.producto_id,
-            cantidad: Number(mov.cantidad),
-            unidad: mov.unidad
-          })
-        }
-
-        if (nuevosMovimientosKardex.length > 0) {
-          const { error: insertMovErr } = await supabase.from('movimiento').insert(nuevosMovimientosKardex)
-          if (insertMovErr) throw insertMovErr
-        }
-      }
-
-      await supabase.from('movimiento').update({ estado: 'cancelado' }).eq('despacho_id', despachoIdNumerico).eq('estado', 'enviado')
-      await supabase.from('despacho').update({ estado_entrega: 'Cancelado' }).eq('id', despachoIdNumerico)
+      if (despErr) throw despErr
 
       toast.error('Despacho cancelado.', { 
-        description: 'La ruta fue anulada, el stock retornó al origen y se registró la devolución en el Kardex.' 
+        description: 'La ruta fue anulada y el stock retornó al origen de forma exacta.' 
       })
       
       setShowCancelModal(false)
@@ -406,15 +362,14 @@ export default function DespachosPage() {
     }
   }
 
-  // LOGICA PARA EXPORTAR EL ELEMENTO HTML A UN PDF DIGITAL PERFECTO
   function handleDownloadPDF() {
     const elemento = printRef.current;
     const opciones = {
-      margin:       [10, 10, 10, 10], // Margen de seguridad estándar
+      margin:       [10, 10, 10, 10],
       filename:     `Guia_Despacho_${guia.numero_guia}.pdf`,
       image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true, logging: false }, // Duplica la escala para alta definición
-      jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' } // Formato Carta Oficial
+      html2canvas:  { scale: 2, useCORS: true, logging: false },
+      jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' }
     };
 
     toast.promise(
@@ -641,7 +596,6 @@ export default function DespachosPage() {
         </div>
       )}
 
-      {/* CREATE VIEW */}
       {view === 'create' && (
         <form onSubmit={handleCreate} className="space-y-4 no-print">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -749,7 +703,7 @@ export default function DespachosPage() {
                             value={item.cantidad}
                             onChange={e => updateCant(item.id, e.target.value)}
                             onBlur={() => handleCantBlur(item.id)}
-                            className="w-12 h-8 border-0 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus-visible:ring-0 focus-visible:ring-offset-0 font-semibold text-xs"
+                            className="w-12 h-8 border-0 text-center focus-visible:ring-0 focus-visible:ring-offset-0 font-semibold text-xs"
                           />
                           <button
                             type="button"
@@ -788,10 +742,8 @@ export default function DespachosPage() {
         </form>
       )}
 
-      {/* DOCUMENTO OFICIAL MANIFIESTO */}
       {view === 'guide' && guia && (
         <div className="space-y-4">
-          
           {guia.estado_entrega === 'En Ruta' && (
             <div className="no-print flex flex-col items-center justify-center gap-2 p-4 bg-secondary/40 border rounded-xl max-w-4xl mx-auto">
               <div className="flex justify-center gap-3 flex-wrap">
@@ -801,11 +753,11 @@ export default function DespachosPage() {
                   </Button>
                 )}
 
-                {(esInstitucionEmisora || isSuperAdmin) && (
+                {/* {(esInstitucionEmisora || isSuperAdmin) && (
                   <Button onClick={() => setShowCancelModal(true)} disabled={actionLoading} variant="destructive" className="gap-2 font-semibold shadow-sm">
                     <XCircle className="w-4 h-4" /> Cancelar Despacho y Reincorporar Stock
                   </Button>
-                )}
+                )} */}
               </div>
               
               {!isSuperAdmin && esInstitucionEmisora && (
@@ -821,7 +773,6 @@ export default function DespachosPage() {
             </div>
           )}
 
-          {/* MENSAJE TÉCNICO DE BLOQUEO SI LA COMPRA/RUTA FUE ANULADA */}
           {guia.estado_entrega === 'Cancelado' ? (
             <div className="no-print p-4 bg-red-50 border border-red-200 rounded-xl max-w-4xl mx-auto flex items-center gap-3 text-red-800">
               <AlertTriangle className="w-5 h-5 shrink-0 text-red-600" />
@@ -831,7 +782,6 @@ export default function DespachosPage() {
               </div>
             </div>
           ) : (
-            // ACCIONES DE DESCARGA E IMPRESIÓN INTERACTIVA
             <div className="no-print flex justify-center gap-3">
               <Button onClick={handleDownloadPDF} className="gap-2 bg-blue-600 hover:bg-blue-500 font-medium text-white shadow-sm">
                 <Download className="w-4 h-4" /> Exportar Documento de Ruta
@@ -839,9 +789,7 @@ export default function DespachosPage() {
             </div>
           )}
 
-          {/* HOJA DE GUÍA FÍSICA / MANIFIESTO COMPILADO */}
           <div ref={printRef} className="bg-white text-black rounded-xl p-6 md:p-10 border shadow-md space-y-6 max-w-4xl mx-auto font-sans relative overflow-hidden">
-            
             {guia.estado_entrega === 'Cancelado' && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-10 opacity-[0.08]">
                 <p className="text-[90px] font-black uppercase tracking-widest text-red-700 border-8 border-red-700 p-6 rounded-3xl rotate-12">
@@ -940,15 +888,14 @@ export default function DespachosPage() {
           <style>{`
             @media print {
               body { background: white; color: black; }
-              .no-print { display: none !important; }
-              .guide-print { box-shadow: none; border: none; margin: 0; padding: 0; }
+              no-print { display: none !important; }
+              guide-print { box-shadow: none; border: none; margin: 0; padding: 0; }
               @page { margin: 1cm; size: portrait; }
             }
           `}</style>
         </div>
       )}
 
-      {/* Scanner overlay */}
       {showScanner && (
         <Scanner
           onDetected={handleBarcodeDetected}

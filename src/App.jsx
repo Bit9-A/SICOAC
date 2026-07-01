@@ -21,6 +21,8 @@ import DespachosPage from '@/pages/Despachos'
 import VoluntariosPage from '@/pages/Voluntarios'
 import VoluntarioRegistroPage from '@/pages/VoluntarioRegistro'
 import QrRegistroPage from '@/pages/QrRegistro'
+import InstalarApk from '@/pages/InstalarApk'
+
 
 function AppContent() {
   const { user, profile, loading, logout, rol, isOperator, isAdmin } = useAuth()
@@ -172,9 +174,13 @@ function AppContent() {
 }
 
 export default function App() {
-  // Ruta pública para registro de voluntarios (sin auth)
+  // Rutas públicas
   if (window.location.pathname === '/voluntario') {
     return <VoluntarioRegistroPage />
+  }
+
+  if (window.location.pathname === '/instalar' || window.location.pathname === '/instalar-apk') {
+    return <InstalarApk />
   }
 
   return (

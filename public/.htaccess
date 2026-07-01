@@ -1,0 +1,2 @@
+# Register correct MIME type for Android APK files to prevent browsers from downloading them as .zip
+AddType application/vnd.android.package-archive .apk
