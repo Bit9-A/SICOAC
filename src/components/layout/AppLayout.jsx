@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { cn } from '@/lib/utils'
 import Sidebar from './Sidebar'
+import BottomNav from './BottomNav'
 
 export default function AppLayout({
   rol, currentPage, onNavigate, onLogout, onOpenScan, user, profile, children
@@ -41,38 +41,57 @@ export default function AppLayout({
     </div>
   )
 
-  // Operador: layout simple sin sidebar
+  // Operador: simple layout, no sidebar — bottom nav only on mobile
   if (isOperator) {
     return (
       <div className="h-dvh flex flex-col bg-background overflow-hidden">
-        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden pb-16 md:pb-0">
           {children}
         </main>
+        <BottomNav
+          rol={rol}
+          currentPage={currentPage}
+          onNavigate={onNavigate}
+          onOpenScan={onOpenScan}
+          onLogout={handleLogoutRequest}
+        />
         {showConfirm && confirmDialog}
       </div>
     )
   }
 
-  // Admin / Super Admin: layout con sidebar
+  // Admin / Super Admin: sidebar on desktop, bottom nav on mobile
   return (
     <div className="h-dvh flex bg-background overflow-hidden">
-      <Sidebar
+      {/* Sidebar — only visible on md+ */}
+      <div className="hidden md:flex h-full">
+        <Sidebar
+          rol={rol}
+          currentPage={currentPage}
+          onNavigate={onNavigate}
+          onLogout={handleLogoutRequest}
+          onOpenScan={onOpenScan}
+          user={user}
+          profile={profile}
+          collapsed={sidebarCollapsed}
+          setCollapsed={setSidebarCollapsed}
+        />
+      </div>
+
+      {/* Main content — add bottom padding for mobile bottom nav */}
+      <main className="flex-1 overflow-y-auto overflow-x-hidden pb-16 md:pb-0">
+        {children}
+      </main>
+
+      {/* Bottom nav — only on mobile */}
+      <BottomNav
         rol={rol}
         currentPage={currentPage}
         onNavigate={onNavigate}
-        onLogout={handleLogoutRequest}
         onOpenScan={onOpenScan}
-        user={user}
-        profile={profile}
-        collapsed={sidebarCollapsed}
-        setCollapsed={setSidebarCollapsed}
+        onLogout={handleLogoutRequest}
       />
-      <main className={cn(
-        'flex-1 overflow-y-auto overflow-x-hidden',
-        sidebarCollapsed && 'pl-14 md:pl-0'
-      )}>
-        {children}
-      </main>
+
       {showConfirm && confirmDialog}
     </div>
   )
