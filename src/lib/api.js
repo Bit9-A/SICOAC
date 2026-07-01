@@ -1,6 +1,9 @@
 import { supabase } from './supabase'
 import { CONFIG } from './config'
 import { normalizeText } from './utils'
+import db, { searchLocalProducts, findLocalProductByBarcode } from './local-db'
+
+const isOnline = () => navigator.onLine !== false
 
 export async function initializeDbData() {
   if (!isConfigured()) return
@@ -86,52 +89,58 @@ export async function initializeDbData() {
 }
 
 export async function getEstados() {
+  const cached = await db.estados.toArray()
+  if (cached.length > 0) return cached
+
   const { data, error } = await supabase.from('estado').select('id, nombre').order('nombre')
-  if (error) {
-    throw error
-  }
-  return data.map((e) => ({ value: e.id, label: e.nombre }))
+  if (error) throw error
+  const mapped = data.map((e) => ({ value: e.id, label: e.nombre }))
+  await db.estados.bulkPut(mapped)
+  return mapped
 }
 
 export async function getMunicipios(estadoId) {
-  if (!estadoId) {
-    return []
-  }
+  if (!estadoId) return []
+  const cached = await db.municipios.where({ estadoId }).toArray()
+  if (cached.length > 0) return cached
+
   const { data, error } = await supabase
     .from('municipio')
     .select('id, nombre')
     .eq('estado_id', estadoId)
     .order('nombre')
-  if (error) {
-    throw error
-  }
-  return data.map((m) => ({ value: m.id, label: m.nombre }))
+  if (error) throw error
+  const mapped = data.map((m) => ({ value: m.id, label: m.nombre, estadoId }))
+  await db.municipios.bulkPut(mapped)
+  return mapped
 }
 
 export async function getParroquias(municipioId) {
-  if (!municipioId) {
-    return []
-  }
+  if (!municipioId) return []
+  const cached = await db.parroquias.where({ municipioId }).toArray()
+  if (cached.length > 0) return cached
+
   const { data, error } = await supabase
     .from('parroquia')
     .select('id, nombre')
     .eq('municipio_id', municipioId)
     .order('nombre')
-  if (error) {
-    throw error
-  }
-  return data.map((p) => ({ value: p.id, label: p.nombre }))
+  if (error) throw error
+  const mapped = data.map((p) => ({ value: p.id, label: p.nombre, municipioId }))
+  await db.parroquias.bulkPut(mapped)
+  return mapped
 }
 
 export async function getInstituciones() {
+  const cached = await db.instituciones.toArray()
+  if (cached.length > 0) return cached
+
   const { data, error } = await supabase
     .from('institucion')
     .select('id, nombre, direccion, parroquia_id, parroquia:parroquia_id (id, nombre, municipio:municipio_id (id, nombre, estado_id))')
     .order('nombre')
-  if (error) {
-    throw error
-  }
-  return data.map((i) => {
+  if (error) throw error
+  const mapped = data.map((i) => {
     const p = i.parroquia
     const m = p?.municipio
     return {
@@ -145,6 +154,8 @@ export async function getInstituciones() {
       estadoId: m?.estado_id || null,
     }
   })
+  await db.instituciones.bulkPut(mapped)
+  return mapped
 }
 
 export async function createInstitucion(nombre, direccion, parroquiaId) {
@@ -159,11 +170,14 @@ export async function createInstitucion(nombre, direccion, parroquiaId) {
 }
 
 export async function getCategorias() {
+  const cached = await db.categorias.toArray()
+  if (cached.length > 0) return cached
+
   const { data, error } = await supabase.from('categoria').select('id, nombre').order('nombre')
-  if (error) {
-    throw error
-  }
-  return data.map((c) => ({ value: c.id, label: c.nombre }))
+  if (error) throw error
+  const mapped = data.map((c) => ({ value: c.id, label: c.nombre }))
+  await db.categorias.bulkPut(mapped)
+  return mapped
 }
 
 export async function createCategoria(nombre) {
@@ -178,12 +192,17 @@ export async function createCategoria(nombre) {
 }
 
 export async function getSubcategorias() {
+  const cached = await db.subcategorias.toArray()
+  if (cached.length > 0) return cached
+
   const { data, error } = await supabase
     .from('subcategoria')
     .select('id, nombre, categoria_id, categoria:categoria_id(nombre)')
     .order('nombre')
   if (error) throw error
-  return data.map((s) => ({ value: s.id, label: s.nombre, categoriaId: s.categoria_id, categoriaNombre: s.categoria?.nombre }))
+  const mapped = data.map((s) => ({ value: s.id, label: s.nombre, categoriaId: s.categoria_id, categoriaNombre: s.categoria?.nombre }))
+  await db.subcategorias.bulkPut(mapped)
+  return mapped
 }
 
 export async function createSubcategoria(nombre, categoriaId) {
@@ -224,68 +243,163 @@ export async function searchBarcodes(query) {
 export async function searchProducts(query) {
   if (!query || query.trim().length < 2) return []
   const q = query.trim()
+
+  // Buscar local primero
+  const localResults = await searchLocalProducts(q)
+  if (localResults.length > 0) {
+    return localResults.map(formatProduct)
+  }
+
+  // Si no hay local, buscar en Supabase y cachear
   const { data, error } = await supabase
     .from('producto')
     .select('id, nombre, descripcion, presentacion, categoria_id, subcategoria_id, categoria:categoria_id (nombre), producto_codigo (codigo)')
     .ilike('nombre', `%${q}%`)
     .limit(8)
 
-  if (error) {
-    return []
-  }
+  if (error) return []
 
-  return data.map((item) => {
-    const cats = Array.isArray(item.categoria) ? item.categoria[0] : item.categoria
-    const codes = Array.isArray(item.producto_codigo) ? item.producto_codigo : []
-    const detail = [cats?.nombre, item.presentacion].filter(Boolean).join(' · ')
-    return {
-      value: String(item.id),
-      label: item.nombre,
-      detail: detail || null,
-      productId: item.id,
-      productName: item.nombre,
-      description: item.descripcion || '',
-      categoryId: item.categoria_id,
-      subcategoriaId: item.subcategoria_id,
-      presentation: item.presentacion || '',
-      barcode: codes[0]?.codigo || '',
+  const mapped = data.map(mapProductRow)
+  await cacheProducts(mapped, data)
+  return mapped
+}
+
+function formatProduct(p) {
+  return {
+    value: String(p.value),
+    label: p.label,
+    detail: p.detail || null,
+    productId: p.value,
+    productName: p.label,
+    description: p.description || '',
+    categoryId: p.categoryId,
+    subcategoriaId: p.subcategoriaId,
+    presentation: p.presentation || '',
+    barcode: p.barcode || '',
+  }
+}
+
+function mapProductRow(item) {
+  const cats = Array.isArray(item.categoria) ? item.categoria[0] : item.categoria
+  const codes = Array.isArray(item.producto_codigo) ? item.producto_codigo : []
+  return {
+    value: item.id,
+    label: item.nombre,
+    detail: [cats?.nombre, item.presentacion].filter(Boolean).join(' · ') || null,
+    productId: item.id,
+    productName: item.nombre,
+    description: item.descripcion || '',
+    categoryId: item.categoria_id,
+    subcategoriaId: item.subcategoria_id,
+    presentation: item.presentacion || '',
+    barcode: codes[0]?.codigo || '',
+  }
+}
+
+async function cacheProducts(mapped, rawRows) {
+  const toCache = mapped.map((p) => ({
+    value: p.value,
+    label: p.label,
+    detail: p.detail,
+    categoryId: p.categoryId,
+    subcategoriaId: p.subcategoriaId,
+    presentation: p.presentation,
+    description: p.description,
+    barcode: p.barcode,
+  }))
+  await db.productos.bulkPut(toCache)
+
+  for (const p of mapped) {
+    if (p.barcode) {
+      await db.productoCodigos.put({ value: p.barcode, codigo: p.barcode, productoId: p.value })
     }
-  })
+  }
 }
 
 export async function findProductByBarcode(barcode) {
-  if (!barcode) {
-    return null
+  if (!barcode) return null
+  const code = barcode.trim()
+
+  // Buscar local primero
+  const local = await findLocalProductByBarcode(code)
+  if (local) {
+    return {
+      id: local.value,
+      productName: local.label,
+      description: local.description || '',
+      presentation: local.presentation || '',
+      categoryId: local.categoryId,
+      subcategoriaId: local.subcategoriaId,
+    }
   }
+
+  // Buscar en Supabase
   const { data, error } = await supabase
     .from('producto_codigo')
     .select('producto_id, producto (id, nombre, descripcion, presentacion, categoria_id, subcategoria_id)')
-    .eq('codigo', barcode.trim())
+    .eq('codigo', code)
     .maybeSingle()
 
-  if (error) {
-    return null
+  if (error || !data?.producto) return null
+
+  const prod = {
+    id: data.producto.id,
+    productName: data.producto.nombre,
+    description: data.producto.descripcion,
+    presentation: data.producto.presentacion,
+    categoryId: data.producto.categoria_id,
+    subcategoriaId: data.producto.subcategoria_id,
   }
 
-  if (data && data.producto) {
-    return {
-      id: data.producto.id,
-      productName: data.producto.nombre,
-      description: data.producto.descripcion,
-      presentation: data.producto.presentacion,
-      categoryId: data.producto.categoria_id,
-      subcategoriaId: data.producto.subcategoria_id,
-    }
-  }
-  return null
+  // Cachear producto encontrado
+  await db.productos.put({
+    value: prod.id,
+    label: prod.productName,
+    description: prod.description,
+    presentation: prod.presentation,
+    categoryId: prod.categoryId,
+    subcategoriaId: prod.subcategoriaId,
+    barcode: code,
+  })
+  await db.productoCodigos.put({ value: code, codigo: code, productoId: prod.id })
+
+  return prod
 }
 
 export async function sendRecord(record) {
-  if (!isConfigured()) {
-    throw new Error('Credenciales de Supabase no configuradas. Crea un archivo .env con VITE_SUPABASE_URL y VITE_SUPABASE_PUBLISHABLE_KEY')
+  // Guardar local primero (offline-first)
+  const localEntry = {
+    ...record,
+    createdAt: new Date().toISOString(),
+  }
+  const localId = await db.movimientos.add(localEntry)
+
+  // Si no hay conexión, encolar para después
+  if (!isOnline() || !isConfigured()) {
+    incrementSessionCount()
+    return { localId, synced: false }
   }
 
-  // 1. Resolve Category ID (create on the fly if categoryId is text)
+  // Online: enviar a Supabase
+  try {
+    return await syncRecordToSupabase(record)
+  } catch (err) {
+    // Si falla, queda en Dexie + cola offline
+    addToQueue(record)
+    throw err
+  }
+}
+
+/**
+ * Envía un registro a Supabase (la lógica original).
+ * Separada para poder llamarla desde sync offline también.
+ */
+async function syncRecordToSupabase(record) {
+  if (!isConfigured()) {
+    throw new Error('Credenciales de Supabase no configuradas')
+  }
+
+  // 1. Resolve Category ID
   let finalCategoryId = record.categoryId
   if (isNaN(Number(record.categoryId))) {
     const newCat = await createCategoria(record.categoryId)
@@ -300,8 +414,6 @@ export async function sendRecord(record) {
     existingProduct = await findProductByBarcode(record.barcode)
   }
 
-  // Si el código no está registrado pero el producto ya existe por nombre,
-  // asociar el nuevo código al producto existente (múltiples códigos por producto)
   if (!existingProduct && record.productName) {
     const { data: prodByName } = await supabase
       .from('producto')
@@ -311,21 +423,18 @@ export async function sendRecord(record) {
 
     if (prodByName) {
       existingProduct = { id: prodByName.id, productName: prodByName.nombre }
-
       if (record.barcode) {
         const { error: codeErr } = await supabase
           .from('producto_codigo')
           .insert([{ producto_id: prodByName.id, codigo: record.barcode.trim() }])
-        if (codeErr && !codeErr.message?.includes('duplicate')) {
-          throw codeErr
-        }
+        if (codeErr && !codeErr.message?.includes('duplicate')) throw codeErr
       }
     }
   }
 
   if (existingProduct) {
     finalProductId = existingProduct.id
-    const { error: updErr } = await supabase
+    await supabase
       .from('producto')
       .update({
         nombre: normalizeText(record.productName) || existingProduct.productName,
@@ -335,69 +444,51 @@ export async function sendRecord(record) {
       })
       .eq('id', finalProductId)
   } else {
-    // Create new product
     const { data: newProd, error: prodErr } = await supabase
       .from('producto')
-      .insert([
-        {
-          nombre: normalizeText(record.productName),
-          descripcion: normalizeText(record.description || ''),
-          categoria_id: finalCategoryId,
-          subcategoria_id: record.subcategoriaId || null,
-          institucion_id: record.institucionId || null,
-        },
-      ])
+      .insert([{
+        nombre: normalizeText(record.productName),
+        descripcion: normalizeText(record.description || ''),
+        categoria_id: finalCategoryId,
+        subcategoria_id: record.subcategoriaId || null,
+        institucion_id: record.institucionId || null,
+      }])
       .select()
-
-    if (prodErr) {
-      throw prodErr
-    }
+    if (prodErr) throw prodErr
     finalProductId = newProd[0].id
 
-    // Insert barcode
     if (record.barcode) {
       const { error: codeErr } = await supabase
         .from('producto_codigo')
         .insert([{ producto_id: finalProductId, codigo: record.barcode.trim() }])
-      if (codeErr) {
-        throw codeErr
-      }
+      if (codeErr) throw codeErr
     }
   }
 
-  // 3. Get Movement Type ID
+  // 3. Movement Type ID
   const { data: tmData, error: tmErr } = await supabase
     .from('tipo_movimiento')
     .select('id')
     .eq('nombre', record.tipoMovimiento)
     .single()
+  if (tmErr) throw tmErr
 
-  if (tmErr) {
-    throw tmErr
-  }
-  const tipoMovimientoId = tmData.id
-
-  // 4. Log Movement Transaction
+  // 4. Insert Movement
   const isTransferencia = record.tipoMovimiento === 'Transferencia'
-  const movementPayload = {
-    producto_id: finalProductId,
-    cantidad: Number(record.quantity) || 1,
-    unidad: record.presentation || 'unidades',
-    peso_unitario: record.peso_unitario || null,
-    institucion_origen_id: isTransferencia ? record.institucionOrigenId : (record.tipoMovimiento === 'Salida' ? record.institucionId : null),
-    institucion_destino_id: isTransferencia ? record.institucionDestinoId : (record.tipoMovimiento === 'Entrada' ? record.institucionId : null),
-    tipo_movimiento_id: tipoMovimientoId,
-    estado: isTransferencia ? 'enviado' : 'completado',
-  }
-
   const { data: movData, error: movErr } = await supabase
     .from('movimiento')
-    .insert([movementPayload])
+    .insert([{
+      producto_id: finalProductId,
+      cantidad: Number(record.quantity) || 1,
+      unidad: record.presentation || 'unidades',
+      peso_unitario: record.peso_unitario || null,
+      institucion_origen_id: isTransferencia ? record.institucionOrigenId : (record.tipoMovimiento === 'Salida' ? record.institucionId : null),
+      institucion_destino_id: isTransferencia ? record.institucionDestinoId : (record.tipoMovimiento === 'Entrada' ? record.institucionId : null),
+      tipo_movimiento_id: tmData.id,
+      estado: isTransferencia ? 'enviado' : 'completado',
+    }])
     .select()
-
-  if (movErr) {
-    throw movErr
-  }
+  if (movErr) throw movErr
   return movData[0]
 }
 
