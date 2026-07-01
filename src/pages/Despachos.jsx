@@ -59,12 +59,6 @@ export default function DespachosPage() {
   const [total, setTotal] = useState(0)
   const pageSize = 20
 
-  useEffect(() => { 
-    if (view === 'list') fetchDespachos() 
-  }, [fetchDespachos, view])
-
-  useEffect(() => { loadData() }, [origenId])
-
   async function loadData() {
     const [insts, choferesRes, vehiculosRes] = await Promise.all([
       getInstituciones(),
@@ -111,6 +105,12 @@ export default function DespachosPage() {
     setDespachos(data || [])
     setTotal(count || 0)
   }, [page, search, activeTab, origenId, isSuperAdmin, institucionId])
+
+  useEffect(() => { 
+    if (view === 'list') fetchDespachos() 
+  }, [fetchDespachos, view])
+
+  useEffect(() => { loadData() }, [origenId])
 
   useEffect(() => {
     if (prodSearch.trim().length < 2 || !origenId) { setProdResults([]); return }

@@ -22,14 +22,6 @@ export default function RegistrosPage() {
   const [loading, setLoading] = useState(true)
   const pageSize = 20
 
-  useEffect(() => {
-    loadMovimientos()
-  }, [loadMovimientos])
-
-  useEffect(() => {
-    getInstituciones().then(setInstituciones)
-  }, [])
-
   const loadMovimientos = useCallback(async () => {
     setLoading(true)
     let q = supabase
@@ -54,6 +46,14 @@ export default function RegistrosPage() {
     setTotal(count || 0)
     setLoading(false)
   }, [page, search, institucionId, isSuperAdmin])
+
+  useEffect(() => {
+    loadMovimientos()
+  }, [loadMovimientos])
+
+  useEffect(() => {
+    getInstituciones().then(setInstituciones)
+  }, [])
 
   const handleSearchChange = (value) => {
     setSearch(value)
