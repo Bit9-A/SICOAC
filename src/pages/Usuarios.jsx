@@ -573,33 +573,33 @@ export default function UsuariosPage() {
                   </div>
                 </form>
               ) : (
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center shrink-0">
                     <User className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{u.nombre} {u.apellido}</p>
-                    <div className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground truncate">
-                      <span>@{u.username}</span>
+                    <div className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+                      <span className="truncate">@{u.username}</span>
                       {u.cedula && (
                         <>
-                          <span className="text-border">•</span>
-                          <span>{u.cedula}</span>
+                          <span className="text-border hidden sm:inline">•</span>
+                          <span className="hidden sm:inline">{u.cedula}</span>
                         </>
                       )}
                     </div>
+                    {u.institucion?.nombre && (
+                      <p className="text-xs text-muted-foreground truncate mt-0.5 md:hidden">{u.institucion.nombre}</p>
+                    )}
                   </div>
-                  {u.institucion?.nombre && <span className="text-sm text-muted-foreground hidden md:inline">{u.institucion.nombre}</span>}
+                  {u.institucion?.nombre && <span className="text-sm text-muted-foreground hidden md:inline shrink-0 max-w-[160px] truncate">{u.institucion.nombre}</span>}
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant={Rb.variant} className="gap-1"><Icon className="w-3 h-3" />{Rb.label}</Badge>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Badge variant={Rb.variant} className="gap-1 hidden sm:flex"><Icon className="w-3 h-3" />{Rb.label}</Badge>
                     <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => startEdit(u)} title="Editar usuario"><Pencil className="w-4 h-4" /></Button>
-                    
-                    {/* Botón de Restablecer Contraseña */}
                     <Button variant="ghost" size="icon" className="w-8 h-8 text-amber-500 hover:text-amber-600 hover:bg-amber-500/10" onClick={() => handleResetPassword(u)} title="Restablecer clave como username" disabled={loading}>
                       <KeyRound className="w-4 h-4" />
                     </Button>
-
                     <Button variant="ghost" size="icon" className="w-8 h-8" onClick={() => handleToggleActive(u.id, u.activo)} title={u.activo ? 'Desactivar' : 'Activar'}>
                       {u.activo ? <ToggleRight className="w-4 h-4 text-emerald-400" /> : <ToggleLeft className="w-4 h-4 text-muted-foreground" />}
                     </Button>

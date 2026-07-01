@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import {
   LayoutDashboard, Package, ClipboardList, Users, Building2, Settings, LogOut, Key,
-  ScanLine, ChevronLeft, Menu, ShoppingBag, Tags, QrCode, Truck, HeartHandshake, Contact, Car, ChevronUp
+  ScanLine, ChevronLeft, ShoppingBag, Tags, QrCode, Truck, HeartHandshake, Contact, Car, ChevronUp
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { updatePassword } from '@/lib/auth'
@@ -38,8 +38,6 @@ const NAV_ITEMS = {
 }
 
 export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpenScan, user, profile, collapsed, setCollapsed }) {
-  const collapsedRef = useRef(collapsed)
-  const touchStartRef = useRef(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [newPassword, setNewPassword] = useState('')
@@ -48,42 +46,6 @@ export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpen
   const items = NAV_ITEMS[rol] || NAV_ITEMS.admin
 
   const initials = profile ? (profile.nombre?.[0] || '') + (profile.apellido?.[0] || '') : '?'
-
-  useEffect(() => {
-    collapsedRef.current = collapsed
-  }, [collapsed])
-
-  useEffect(() => {
-    const SWIPE_ZONE = window.innerWidth * 0.2
-    const THRESHOLD = 50
-
-    const handleTouchStart = (e) => {
-      if (e.touches[0].clientX > SWIPE_ZONE) return
-      touchStartRef.current = e.touches[0].clientX
-    }
-
-    const handleTouchMove = (e) => {
-      if (touchStartRef.current === null) return
-      const delta = e.touches[0].clientX - touchStartRef.current
-      if (delta > THRESHOLD && collapsedRef.current) setCollapsed(false)
-      if (delta < -THRESHOLD && !collapsedRef.current) setCollapsed(true)
-      touchStartRef.current = null
-    }
-
-    const handleTouchEnd = () => {
-      touchStartRef.current = null
-    }
-
-    document.addEventListener('touchstart', handleTouchStart, { passive: true })
-    document.addEventListener('touchmove', handleTouchMove, { passive: true })
-    document.addEventListener('touchend', handleTouchEnd, { passive: true })
-
-    return () => {
-      document.removeEventListener('touchstart', handleTouchStart)
-      document.removeEventListener('touchmove', handleTouchMove)
-      document.removeEventListener('touchend', handleTouchEnd)
-    }
-  }, [])
 
   function handleLogoutClick() {
     setShowUserMenu(false)
@@ -111,14 +73,9 @@ export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpen
 
   return (
     <>
-      {/* Mobile overlay */}
-      {!collapsed && (
-        <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setCollapsed(true)} />
-      )}
-
       <aside className={cn(
-        'fixed md:static inset-y-0 left-0 z-30 flex flex-col bg-card border-r border-border transition-all duration-200',
-        collapsed ? '-translate-x-full md:translate-x-0 md:w-16' : 'w-64 translate-x-0'
+        'flex flex-col bg-card border-r border-border transition-all duration-200 h-full',
+        collapsed ? 'w-16' : 'w-64'
       )}>
         {/* Logo */}
         <div className="flex items-center gap-2 h-14 px-4 border-b border-border shrink-0">
@@ -158,13 +115,16 @@ export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpen
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
                 className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative',
                   isActive
                     ? 'bg-primary/10 text-primary'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 )}
               >
-                <Icon className="w-5 h-5 shrink-0" />
+                {isActive && !collapsed && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-full" />
+                )}
+                <Icon className={cn('w-5 h-5 shrink-0 transition-transform', isActive && 'scale-110')} />
                 {!collapsed && <span>{item.label}</span>}
               </button>
             )
@@ -248,15 +208,6 @@ export default function Sidebar({ rol, currentPage, onNavigate, onLogout, onOpen
         </div>
       )}
 
-      {/* Mobile hamburger */}
-      {collapsed && (
-        <button
-          onClick={() => setCollapsed(false)}
-          className="fixed top-3 left-3 z-20 w-10 h-10 rounded-lg bg-card border border-border shadow flex items-center justify-center md:hidden"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-      )}
     </>
   )
 }

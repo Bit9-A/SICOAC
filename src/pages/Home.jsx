@@ -52,12 +52,12 @@ export default function Home({ onStartScan, onStartManual, sessionCount }) {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-full px-4 py-8 md:py-12 lg:py-16">
-      <div className="w-full max-w-md mx-auto space-y-6">
+      <div className="w-full max-w-md mx-auto space-y-5">
 
         {/* Hero */}
-        <div className="text-center space-y-3 pb-2">
-          <div className="inline-flex items-center justify-center w-16 h-14 bg-primary/10 mb-2">
-            <img src="/logo_sicoac.png" alt="Logo SICOAC" />
+        <div className="text-center space-y-2 pb-2">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-2">
+            <img src="/logo_sicoac.png" alt="Logo SICOAC" className="w-10 h-10 object-contain" />
           </div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
             Centros de Acopio
@@ -65,13 +65,13 @@ export default function Home({ onStartScan, onStartManual, sessionCount }) {
           {profile && (
             <p className="text-sm text-muted-foreground">
               {profile.nombre} {profile.apellido}
-              {profile.institucion && <span> — {profile.institucion.nombre}</span>}
+              {profile.institucion && <span className="block text-xs mt-0.5 text-muted-foreground/70">{profile.institucion.nombre}</span>}
             </p>
           )}
         </div>
 
         {/* Big action button */}
-        <Button size="lg" className="w-full gap-3 text-base h-14" onClick={onStartScan}>
+        <Button size="lg" className="w-full gap-3 text-base h-14 rounded-xl shadow-lg shadow-primary/20" onClick={onStartScan}>
           <ScanLine className="w-6 h-6" />
           {isOperator ? 'Registrar Entrada' : 'Registrar Producto'}
         </Button>

@@ -86,6 +86,11 @@ img {
   }
 }
 
+/* Mobile safe area (iPhone notch / home indicator) */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
